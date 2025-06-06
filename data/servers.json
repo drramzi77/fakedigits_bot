@@ -1,0 +1,176 @@
+[
+  {
+    "platform": "WhatsApp",
+    "country": "sa",
+    "servers": [
+      { "id": 1, "name": "⚡ سيرفر سريع", "price": 5 },
+      { "id": 2, "name": "🎯 سيرفر موثوق", "price": 7 },
+      { "id": 3, "name": "💎 سيرفر مميز", "price": 9 }
+    ]
+  },
+  {
+    "platform": "Telegram",
+    "country": "sa",
+    "servers": [
+      { "id": 1, "name": "⚡ تيلي سيرفر سريع", "price": 4 },
+      { "id": 2, "name": "🎯 تيلي سيرفر موثوق", "price": 6 }
+    ]
+  },
+  {
+    "platform": "WhatsApp",
+    "country": "eg",
+    "servers": [
+      { "id": 1, "name": "⚡ سيرفر سريع", "price": 4 },
+      { "id": 2, "name": "🎯 سيرفر موثوق", "price": 6 }
+    ]
+  },
+  {
+    "platform": "Telegram",
+    "country": "eg",
+    "servers": [
+      { "id": 1, "name": "⚡ تيلي سيرفر سريع", "price": 3 }
+    ]
+  },
+  {
+    "platform": "WhatsApp",
+    "country": "dz",
+    "servers": [
+      { "id": 1, "name": "💎 سيرفر مميز", "price": 10 }
+    ]
+  },
+  {
+    "platform": "Telegram",
+    "country": "dz",
+    "servers": [
+      { "id": 1, "name": "🎯 تيلي سيرفر موثوق", "price": 7 }
+    ]
+  },
+  {
+    "platform": "WhatsApp",
+    "country": "ng",
+    "servers": [
+      { "id": 1, "name": "⚡ سيرفر سريع", "price": 3 }
+    ]
+  },
+  {
+    "platform": "Telegram",
+    "country": "ng",
+    "servers": [
+      { "id": 1, "name": "💎 تيلي سيرفر مميز", "price": 5 }
+    ]
+  },
+  {
+    "platform": "WhatsApp",
+    "country": "in",
+    "servers": [
+      { "id": 1, "name": "🎯 سيرفر موثوق", "price": 2 }
+    ]
+  },
+  {
+    "platform": "Telegram",
+    "country": "in",
+    "servers": [
+      { "id": 1, "name": "⚡ تيلي سيرفر سريع", "price": 2 }
+    ]
+  },
+  {
+    "platform": "WhatsApp",
+    "country": "ph",
+    "servers": [
+      { "id": 1, "name": "⚡ سيرفر سريع", "price": 2 },
+      { "id": 2, "name": "💎 سيرفر مميز", "price": 5 }
+    ]
+  },
+  {
+    "platform": "Telegram",
+    "country": "ph",
+    "servers": [
+      { "id": 1, "name": "🎯 تيلي سيرفر موثوق", "price": 3 }
+    ]
+  },
+  {
+    "platform": "WhatsApp",
+    "country": "de",
+    "servers": [
+      { "id": 1, "name": "🎯 سيرفر موثوق", "price": 6 }
+    ]
+  },
+  {
+    "platform": "Telegram",
+    "country": "de",
+    "servers": [
+      { "id": 1, "name": "⚡ تيلي سيرفر سريع", "price": 4 }
+    ]
+  },
+  {
+    "platform": "WhatsApp",
+    "country": "fr",
+    "servers": [
+      { "id": 1, "name": "⚡ سيرفر سريع", "price": 5 }
+    ]
+  },
+  {
+    "platform": "Telegram",
+    "country": "fr",
+    "servers": [
+      { "id": 1, "name": "🎯 تيلي سيرفر موثوق", "price": 4 }
+    ]
+  },
+  {
+    "platform": "WhatsApp",
+    "country": "us",
+    "servers": [
+      { "id": 1, "name": "💎 سيرفر مميز", "price": 8 },
+      { "id": 2, "name": "🎯 سيرفر موثوق", "price": 6 }
+    ]
+  },
+  {
+    "platform": "Telegram",
+    "country": "us",
+    "servers": [
+      { "id": 1, "name": "⚡ تيلي سيرفر سريع", "price": 5 }
+    ]
+  },
+  {
+    "platform": "WhatsApp",
+    "country": "ca",
+    "servers": [
+      { "id": 1, "name": "⚡ سيرفر سريع", "price": 4 }
+    ]
+  },
+  {
+    "platform": "Telegram",
+    "country": "ca",
+    "servers": [
+      { "id": 1, "name": "💎 تيلي سيرفر مميز", "price": 6 }
+    ]
+  },
+  {
+    "platform": "WhatsApp",
+    "country": "au",
+    "servers": [
+      { "id": 1, "name": "💎 سيرفر مميز", "price": 7 }
+    ]
+  },
+  {
+    "platform": "Telegram",
+    "country": "au",
+    "servers": [
+      { "id": 1, "name": "🎯 تيلي سيرفر موثوق", "price": 5 }
+    ]
+  },
+  {
+    "platform": "WhatsApp",
+    "country": "nz",
+    "servers": [
+      { "id": 1, "name": "🎯 سيرفر موثوق", "price": 6 }
+    ]
+  },
+  {
+    "platform": "Telegram",
+    "country": "nz",
+    "servers": [
+      { "id": 1, "name": "⚡ تيلي سيرفر سريع", "price": 4 }
+    ]
+  }
+]
