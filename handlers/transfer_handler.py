@@ -56,7 +56,6 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     balance = get_user_balance(user_id)
 
-    # إضافة سجل للتحقق من استدعاء الدالة وحالة user_data
     logger.info(f"start_transfer: المستخدم {user_id} ضغط على تحويل الرصيد. user_data قبل التعديل: {context.user_data}")
 
     if update.callback_query:
@@ -88,9 +87,12 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await message_editor(msg, parse_mode="HTML", reply_markup=contact_admin_button())
     else:
-        context.user_data["transfer_stage"] = "awaiting_input"
-        # إضافة سجل للتحقق من تعيين الحالة
-        logger.info(f"start_transfer: تم تعيين transfer_stage لـ {user_id} إلى 'awaiting_input'. user_data بعد التعديل: {context.user_data}")
+        # # مسح جميع حالات الانتظار الأخرى وضبط الحالة الحالية
+        context.user_data.clear() # # مسح كل شيء لتجنب أي تعارضات سابقة
+        context.user_data["awaiting_input"] = "transfer_amount" # # تحديد نوع الإدخال المنتظر
+        context.user_data["transfer_stage"] = "awaiting_input" # # المرحلة القديمة للتحويل (يمكن إزالتها إذا تم إعادة هيكلة handle_transfer_input بالكامل)
+        
+        logger.info(f"start_transfer: تم تعيين awaiting_input لـ {user_id} إلى 'transfer_amount'. user_data بعد التعديل: {context.user_data}")
         await message_editor(
             f"💰 رصيدك الحالي: <b>{balance} ر.س</b>\n\n"
             "🔁 <b>تحويل الرصيد</b>\n\n"
@@ -110,114 +112,115 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ✅ معالجة مدخلات التحويل وطلب التأكيد
 async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    # إضافة سجل للتحقق من استدعاء الدالة وحالة user_data
     logger.info(f"handle_transfer_input: المستخدم {user_id} أرسل نص: '{update.message.text}'. user_data: {context.user_data}")
 
-    if context.user_data.get("transfer_stage") == "awaiting_input":
-        text = update.message.text.strip()
-        parts = text.split()
+    # # لم نعد نتحقق من awaiting_input هنا، لأن الموجه (router) قام بذلك بالفعل.
+    # # ولكن ما زلنا بحاجة إلى التحقق من transfer_stage للتحقق من سلامة العملية.
+    if context.user_data.get("transfer_stage") != "awaiting_input":
+        # # هذا يجب أن لا يحدث إذا كان الموجه يعمل بشكل صحيح
+        logger.warning(f"handle_transfer_input: تم استدعاء الدالة بشكل غير متوقع. user_data: {context.user_data}")
+        await update.message.reply_text("❌ حدث خطأ داخلي. يرجى البدء من جديد.")
+        context.user_data.clear()
+        return
 
-        if len(parts) != 2:
-            await update.message.reply_text(
-                "❌ الصيغة غير صحيحة. استخدم:\n<code>123456789 20</code>",
-                parse_mode="HTML",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
-                ])
-            )
-            logger.warning(f"المستخدم {user_id} أدخل تنسيقًا غير صالح للتحويل: '{text}'.")
-            return
+    text = update.message.text.strip()
+    parts = text.split()
 
-        try:
-            target_id = int(parts[0])
-            amount = float(parts[1])
-        except ValueError as e:
-            logger.warning(f"المستخدم {user_id} أدخل معرفًا أو مبلغًا غير رقمي للتحويل: '{text}'. الخطأ: {e}")
-            await update.message.reply_text(
-                "❌ تأكد من أن المعرف والمبلغ أرقام صحيحة.",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
-                ])
-            )
-            return
-
-        if target_id == user_id:
-            await update.message.reply_text(
-                "❌ لا يمكنك تحويل الرصيد إلى نفسك.",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
-                ])
-            )
-            logger.warning(f"المستخدم {user_id} حاول تحويل الرصيد إلى نفسه.")
-            return
-
-        if amount <= 0:
-            await update.message.reply_text(
-                "❌ المبلغ يجب أن يكون أكبر من صفر.",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
-                ])
-            )
-            logger.warning(f"المستخدم {user_id} حاول تحويل مبلغ غير موجب: {amount}.")
-            return
-
-        balance = get_user_balance(user_id)
-        fee = round(amount * 0.01, 2)
-        total_deduction = round(amount + fee, 2)
-
-        if balance < total_deduction:
-            await update.message.reply_text(
-                f"❌ رصيدك غير كافٍ لإتمام التحويل المطلوب.\nرصيدك الحالي: {balance} ر.س\nالمطلوب: {total_deduction} ر.س",
-                parse_mode="HTML",
-                reply_markup=contact_admin_button()
-            )
-            logger.info(f"المستخدم {user_id} ليس لديه رصيد كافٍ لتحويل {amount} إلى {target_id}. الرصيد: {balance}.")
-            return
-
-        context.user_data["transfer_details"] = {
-            "target_id": target_id,
-            "amount": amount,
-            "fee": fee,
-            "total_deduction": total_deduction
-        }
-        context.user_data["transfer_stage"] = "confirm_transfer"
-        # إضافة سجل للتحقق من تعيين الحالة وتفاصيل التحويل
-        logger.info(f"handle_transfer_input: تم تعيين transfer_stage لـ {user_id} إلى 'confirm_transfer' وتفاصيل التحويل: {context.user_data.get('transfer_details')}")
-
-        confirmation_message = (
-            f"🔁 <b>تأكيد تحويل الرصيد</b>\n\n"
-            f"✅ سيتم تحويل: <b>{amount} ر.س</b>\n"
-            f"👤 إلى معرف: <code>{target_id}</code>\n"
-            f"💸 عمولة التحويل: <b>{fee} ر.س</b>\n"
-            f"💰 إجمالي الخصم من رصيدك: <b>{total_deduction} ر.س</b>\n\n"
-            "⚠️ يرجى التأكد من صحة المعرف. لا يمكن التراجع عن هذه العملية."
-        )
-        confirmation_keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("✅ تأكيد التحويل", callback_data="confirm_transfer_yes"),
-                InlineKeyboardButton("❌ إلغاء", callback_data="confirm_transfer_no")
-            ],
-            [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
-        ])
-
+    if len(parts) != 2:
         await update.message.reply_text(
-            confirmation_message,
-            reply_markup=confirmation_keyboard,
-            parse_mode="HTML"
+            "❌ الصيغة غير صحيحة. استخدم:\n<code>123456789 20</code>",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+            ])
         )
-        logger.info(f"المستخدم {user_id} على وشك تحويل {amount} إلى {target_id}. يطلب التأكيد.")
-    else:
-        # إضافة سجل للتأكد ما إذا كان المعالج يُستدعى خارج المرحلة الصحيحة
-        logger.debug(f"handle_transfer_input: المستخدم {user_id} أرسل نصًا ولكن ليس في مرحلة 'awaiting_input'. النص: '{update.message.text}', الحالة: {context.user_data.get('transfer_stage')}")
-        pass # دع الرسالة تمر إلى معالجات أخرى إذا لم تكن في مرحلة التحويل
+        logger.warning(f"المستخدم {user_id} أدخل تنسيقًا غير صالح للتحويل: '{text}'.")
+        return # # لا نُرجع True هنا لأن الموجه هو من يحدد ذلك
 
+    try:
+        target_id = int(parts[0])
+        amount = float(parts[1])
+    except ValueError as e:
+        logger.warning(f"المستخدم {user_id} أدخل معرفًا أو مبلغًا غير رقمي للتحويل: '{text}'. الخطأ: {e}")
+        await update.message.reply_text(
+            "❌ تأكد من أن المعرف والمبلغ أرقام صحيحة.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+            ])
+        )
+        return 
+
+    if target_id == user_id:
+        await update.message.reply_text(
+            "❌ لا يمكنك تحويل الرصيد إلى نفسك.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+            ])
+        )
+        logger.warning(f"المستخدم {user_id} حاول تحويل الرصيد إلى نفسه.")
+        return 
+
+    if amount <= 0:
+        await update.message.reply_text(
+            "❌ المبلغ يجب أن يكون أكبر من صفر.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+            ])
+        )
+        logger.warning(f"المستخدم {user_id} حاول تحويل مبلغ غير موجب: {amount}.")
+        return 
+
+    balance = get_user_balance(user_id)
+    fee = round(amount * 0.01, 2)
+    total_deduction = round(amount + fee, 2)
+
+    if balance < total_deduction:
+        await update.message.reply_text(
+            f"❌ رصيدك غير كافٍ لإتمام التحويل المطلوب.\nرصيدك الحالي: {balance} ر.س\nالمطلوب: {total_deduction} ر.س",
+            parse_mode="HTML",
+            reply_markup=contact_admin_button()
+        )
+        logger.info(f"المستخدم {user_id} ليس لديه رصيد كافٍ لتحويل {amount} إلى {target_id}. الرصيد: {balance}.")
+        return 
+
+    context.user_data["transfer_details"] = {
+        "target_id": target_id,
+        "amount": amount,
+        "fee": fee,
+        "total_deduction": total_deduction
+    }
+    context.user_data["transfer_stage"] = "confirm_transfer"
+    logger.info(f"handle_transfer_input: تم تعيين transfer_stage لـ {user_id} إلى 'confirm_transfer' وتفاصيل التحويل: {context.user_data.get('transfer_details')}")
+
+    confirmation_message = (
+        f"🔁 <b>تأكيد تحويل الرصيد</b>\n\n"
+        f"✅ سيتم تحويل: <b>{amount} ر.س</b>\n"
+        f"👤 إلى معرف: <code>{target_id}</code>\n"
+        f"💸 عمولة التحويل: <b>{fee} ر.س</b>\n"
+        f"💰 إجمالي الخصم من رصيدك: <b>{total_deduction} ر.س</b>\n\n"
+        "⚠️ يرجى التأكد من صحة المعرف. لا يمكن التراجع عن هذه العملية."
+    )
+    confirmation_keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ تأكيد التحويل", callback_data="confirm_transfer_yes"),
+            InlineKeyboardButton("❌ إلغاء", callback_data="confirm_transfer_no")
+        ],
+        [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+    ])
+
+    await update.message.reply_text(
+        confirmation_message,
+        reply_markup=confirmation_keyboard,
+        parse_mode="HTML"
+    )
+    logger.info(f"المستخدم {user_id} على وشك تحويل {amount} إلى {target_id}. يطلب التأكيد.")
+    return 
 
 # ✅ تنفيذ التحويل الفعلي بعد التأكيد
 async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
-    # إضافة سجل للتحقق من استدعاء الدالة وحالة user_data
     logger.info(f"confirm_transfer: المستخدم {user_id} ضغط زر التأكيد: '{query.data}'. user_data: {context.user_data}")
 
     if context.user_data.get("transfer_stage") != "confirm_transfer":
@@ -382,4 +385,4 @@ async def clear_all_transfers(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.info(f"المشرف {user_id} قام بحذف جميع سجلات التحويلات.")
     except Exception as e:
         logger.error(f"المشرف {user_id} فشل في حذف سجل التحويلات: {e}", exc_info=True)
-        await update.callback_query.message.edit_text("❌ حدث خطأ أثناء الحذف. يرجى مراجعة سجلات البوت.")
+        await update.callback_query.message.reply_text("❌ حدث خطأ أثناء الحذف. يرجى مراجعة سجلات البوت.")
