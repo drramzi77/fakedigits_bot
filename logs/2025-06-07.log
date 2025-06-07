@@ -1,4 +1,28 @@
-2025-06-07 06:03:41 - root - INFO - تم تهيئة نظام التسجيل بنجاح.
-2025-06-07 06:03:41 - __main__ - INFO - ✅ البوت يعمل الآن...
-2025-06-07 06:03:42 - apscheduler.scheduler - INFO - Scheduler started
-2025-06-07 06:04:02 - handlers.transfer_handler - INFO - المستخدم 6366374333 بدأ عملية تحويل الرصيد. رصيده الحالي: 1000.0.
+2025-06-07 06:28:17 - root - INFO - تم تهيئة نظام التسجيل بنجاح.
+2025-06-07 06:28:18 - __main__ - INFO - ✅ البوت يعمل الآن...
+2025-06-07 06:28:19 - apscheduler.scheduler - INFO - Scheduler started
+2025-06-07 06:29:18 - handlers.transfer_handler - INFO - start_transfer: المستخدم 6366374333 ضغط على تحويل الرصيد. user_data قبل التعديل: {}
+2025-06-07 06:29:18 - handlers.transfer_handler - INFO - start_transfer: تم تعيين transfer_stage لـ 6366374333 إلى 'awaiting_input'. user_data بعد التعديل: {'transfer_stage': 'awaiting_input'}
+2025-06-07 06:29:18 - handlers.transfer_handler - INFO - المستخدم 6366374333 بدأ عملية تحويل الرصيد. رصيده الحالي: 1000.0.
+2025-06-07 06:29:47 - handlers.transfer_handler - INFO - handle_transfer_input: المستخدم 6366374333 أرسل نص: '123456789 20'. user_data: {'transfer_stage': 'awaiting_input'}
+2025-06-07 06:29:47 - handlers.transfer_handler - INFO - handle_transfer_input: تم تعيين transfer_stage لـ 6366374333 إلى 'confirm_transfer' وتفاصيل التحويل: {'target_id': 123456789, 'amount': 20.0, 'fee': 0.2, 'total_deduction': 20.2}
+2025-06-07 06:29:47 - handlers.transfer_handler - INFO - المستخدم 6366374333 على وشك تحويل 20.0 إلى 123456789. يطلب التأكيد.
+2025-06-07 06:30:09 - handlers.transfer_handler - INFO - confirm_transfer: المستخدم 6366374333 ضغط زر التأكيد: 'confirm_transfer_yes'. user_data: {'transfer_stage': 'confirm_transfer', 'transfer_details': {'target_id': 123456789, 'amount': 20.0, 'fee': 0.2, 'total_deduction': 20.2}}
+2025-06-07 06:30:09 - utils.balance - INFO - تم تحديث رصيد المستخدم 6366374333 بمقدار -20.2. الرصيد الجديد: 979.8.
+2025-06-07 06:30:09 - utils.balance - INFO - تم تحديث رصيد المستخدم 123456789 بمقدار 20.0. الرصيد الجديد: 20.0.
+2025-06-07 06:30:09 - handlers.transfer_handler - INFO - تم تسجيل تحويل: من 6366374333 إلى 123456789 بمبلغ 20.0.
+2025-06-07 06:30:09 - handlers.transfer_handler - INFO - المستخدم 6366374333 أكد وحوّل 20.0 إلى 123456789. الرصيد الجديد: 979.8.
+2025-06-07 06:30:26 - handlers.transfer_handler - INFO - start_transfer: المستخدم 6366374333 ضغط على تحويل الرصيد. user_data قبل التعديل: {}
+2025-06-07 06:30:26 - handlers.transfer_handler - INFO - start_transfer: تم تعيين transfer_stage لـ 6366374333 إلى 'awaiting_input'. user_data بعد التعديل: {'transfer_stage': 'awaiting_input'}
+2025-06-07 06:30:26 - handlers.transfer_handler - INFO - المستخدم 6366374333 بدأ عملية تحويل الرصيد. رصيده الحالي: 979.8.
+2025-06-07 06:30:33 - handlers.transfer_handler - INFO - handle_transfer_input: المستخدم 6366374333 أرسل نص: '123456789 20'. user_data: {'transfer_stage': 'awaiting_input'}
+2025-06-07 06:30:33 - handlers.transfer_handler - INFO - handle_transfer_input: تم تعيين transfer_stage لـ 6366374333 إلى 'confirm_transfer' وتفاصيل التحويل: {'target_id': 123456789, 'amount': 20.0, 'fee': 0.2, 'total_deduction': 20.2}
+2025-06-07 06:30:33 - handlers.transfer_handler - INFO - المستخدم 6366374333 على وشك تحويل 20.0 إلى 123456789. يطلب التأكيد.
+2025-06-07 06:30:36 - handlers.transfer_handler - INFO - confirm_transfer: المستخدم 6366374333 ضغط زر التأكيد: 'confirm_transfer_no'. user_data: {'transfer_stage': 'confirm_transfer', 'transfer_details': {'target_id': 123456789, 'amount': 20.0, 'fee': 0.2, 'total_deduction': 20.2}}
+2025-06-07 06:30:37 - handlers.transfer_handler - INFO - المستخدم 6366374333 ألغى عملية التحويل.
+2025-06-07 06:31:48 - handlers.profile_handler - WARNING - ملف المشتريات 'data/purchases.json' غير موجود عند جلب احصائيات الطلبات.
+2025-06-07 06:31:49 - handlers.profile_handler - INFO - تم عرض الملف الشخصي للمستخدم 6366374333.
+2025-06-07 06:31:51 - handlers.profile_handler - INFO - المستخدم 6366374333 حاول عرض المشتريات ولكن ملف 'data/purchases.json' غير موجود.
+2025-06-07 06:31:56 - handlers.profile_handler - WARNING - ملف المشتريات 'data/purchases.json' غير موجود عند جلب احصائيات الطلبات.
+2025-06-07 06:31:56 - handlers.profile_handler - INFO - تم عرض الملف الشخصي للمستخدم 6366374333.
+2025-06-07 06:31:58 - handlers.profile_handler - INFO - المستخدم 6366374333 فتح صفحة طلب سحب الرصيد.
