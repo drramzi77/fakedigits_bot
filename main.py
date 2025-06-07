@@ -1,5 +1,5 @@
-import logging #
-from utils.logger import setup_logging #
+import logging
+from utils.logger import setup_logging
 
 from handlers.category_handler import (
     handle_category_selection,
@@ -16,7 +16,8 @@ from handlers.transfer_handler import (
     handle_transfer_input,
     show_transfer_logs,
     confirm_clear_transfers,
-    clear_all_transfers
+    clear_all_transfers,
+    confirm_transfer # # تم التأكد من استيراد هذه الدالة هنا
 )
 from handlers.profile_handler import (
     handle_withdraw_request,
@@ -42,11 +43,14 @@ from handlers.admin_users import (
     handle_block_user,
     handle_delete_user,
     handle_edit_user_balance,
-    receive_balance_input
+    receive_balance_input,
+    confirm_delete_user,
+    back_to_dashboard_clear_admin_search # # تم التأكد من استيراد هذه الدالة هنا
 )
 
+
 # ✅ ربح رصيد مجانًا
-from handlers.earn_credit_handler import show_earn_credit_page, view_referrals  # ✅ تمت الإضافة
+from handlers.earn_credit_handler import show_earn_credit_page, view_referrals
 
 from utils.balance import add_balance, deduct_balance
 from utils.check_balance import check_balance
@@ -98,8 +102,8 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
 
 # ✅ تشغيل البوت
 def main():
-    setup_logging() # # استدعاء تهيئة الـ logging هنا
-    logger = logging.getLogger(__name__) #
+    setup_logging()
+    logger = logging.getLogger(__name__)
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     # أوامر
@@ -141,6 +145,7 @@ def main():
     app.add_handler(CallbackQueryHandler(show_transfer_logs, pattern="^view_transfer_logs$"))
     app.add_handler(CallbackQueryHandler(confirm_clear_transfers, pattern="^confirm_clear_transfers$"))
     app.add_handler(CallbackQueryHandler(clear_all_transfers, pattern="^clear_transfers$"))
+    app.add_handler(CallbackQueryHandler(confirm_transfer, pattern="^confirm_transfer_")) # # يجب أن يكون هذا السطر موجوداً
     app.add_handler(CallbackQueryHandler(show_balance_only, pattern="^check_balance$"))
     app.add_handler(CallbackQueryHandler(show_available_platforms, pattern="^available_platforms$"))
     app.add_handler(CallbackQueryHandler(handle_withdraw_request, pattern="^withdraw_request$"))
@@ -154,19 +159,23 @@ def main():
     # إدارة المستخدمين
     app.add_handler(CallbackQueryHandler(handle_admin_users, pattern="^admin_users$"))
     app.add_handler(CallbackQueryHandler(handle_block_user, pattern="^toggleban_"))
-    app.add_handler(CallbackQueryHandler(handle_delete_user, pattern="^delete_"))
+    app.add_handler(CallbackQueryHandler(handle_delete_user, pattern="^delete_user_confirmed_"))
     app.add_handler(CallbackQueryHandler(handle_edit_user_balance, pattern="^edit_"))
-
-    # استلام البيانات
+    app.add_handler(CallbackQueryHandler(confirm_delete_user, pattern="^confirm_delete_"))
+    app.add_handler(CallbackQueryHandler(back_to_dashboard_clear_admin_search, pattern="^back_to_dashboard_clear_admin_search$")) # # إضافة هذا السطر الجديد
+    
+    # استلام البيانات (هذه المعالجات يجب أن تكون في نهاية قائمة MessageHandler)
+    # ترتيبها مهم: المعالجات الأكثر تحديداً يجب أن تكون أولاً
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, receive_balance_input))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_admin_search))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_transfer_input)) # # هذا السطر كان مفقوداً أو غير صحيح
 
-   
+
     # كن وكيلا معنا
     app.add_handler(CallbackQueryHandler(show_agent_info, pattern="^become_agent$"))
     app.add_handler(CallbackQueryHandler(apply_as_agent, pattern="^apply_agent$"))
 
-    logger.info("✅ البوت يعمل الآن...") # # غير print() إلى logger.info()
+    logger.info("✅ البوت يعمل الآن...")
     app.run_polling()
 
 if __name__ == "__main__":
