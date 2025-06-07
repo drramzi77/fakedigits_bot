@@ -1,0 +1,13 @@
+2025-06-08 01:28:14 - root - INFO - تم تهيئة نظام التسجيل بنجاح.
+2025-06-08 01:28:14 - __main__ - INFO - ✅ البوت يعمل الآن...
+2025-06-08 01:28:16 - apscheduler.scheduler - INFO - Scheduler started
+2025-06-08 01:28:47 - handlers.quick_search_handler - INFO - المستخدم 780028688 بدأ البحث السريع العام عن الدول.
+2025-06-08 01:28:53 - handlers.input_router - INFO - handle_all_text_input: المستخدم 780028688 أرسل نص: 'جيبوتي'. نوع المدخل المنتظر: 'quick_search_country_general'. user_data: {'awaiting_input': 'quick_search_country_general'}
+2025-06-08 01:28:53 - handlers.quick_search_handler - INFO - handle_text_input: تم استدعاء الدالة. user_data: {'awaiting_input': 'quick_search_country_general'}
+2025-06-08 01:28:53 - handlers.quick_search_handler - INFO - handle_text_input: الحالة صحيحة للبحث العام. النص: 'جيبوتي'
+2025-06-08 01:28:53 - handlers.quick_search_handler - INFO - handle_text_input: لم يتم العثور على كود الدولة لـ 'جيبوتي'.
+2025-06-08 01:29:09 - handlers.admin_users - INFO - تم عرض قائمة المستخدمين الإدارية لـ ''.
+2025-06-08 01:29:14 - handlers.profile_handler - INFO - المستخدم 780028688 فتح صفحة طلب سحب الرصيد.
+2025-06-08 01:29:20 - handlers.transfer_handler - INFO - المشرف 780028688 عرض آخر 3 تحويلات.
+2025-06-08 01:29:32 - handlers.admin_users - INFO - تم عرض قائمة المستخدمين الإدارية لـ ''.
+2025-06-08 01:29:36 - handlers.transfer_handler - INFO - المشرف 780028688 عرض آخر 3 تحويلات.
