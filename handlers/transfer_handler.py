@@ -1,8 +1,12 @@
 import json
+import os
+import logging # # إضافة هذا السطر
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.balance import get_user_balance, update_balance
+
+logger = logging.getLogger(__name__) # # إضافة هذا السطر
 
 ADMIN_IDS = [780028688]  # ← ضع معرفك كمشرف
 TRANSFER_LOG_FILE = "data/transfers.json"
@@ -23,15 +27,26 @@ def log_transfer(sender_id, target_id, amount, fee):
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
+    data = []
     try:
-        with open(TRANSFER_LOG_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        data = []
+        if os.path.exists(TRANSFER_LOG_FILE): # # التحقق من وجود الملف
+            with open(TRANSFER_LOG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+    except json.JSONDecodeError:
+        logger.error(f"ملف سجل التحويلات '{TRANSFER_LOG_FILE}' تالف. سيتم إعادة إنشائه.", exc_info=True)
+        data = [] # # إذا كان الملف تالفًا، ابدأ بقائمة فارغة
+    except FileNotFoundError:
+        logger.warning(f"ملف سجل التحويلات '{TRANSFER_LOG_FILE}' غير موجود. سيتم إنشاؤه.")
 
     data.append(transfer)
-    with open(TRANSFER_LOG_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    try:
+        with open(TRANSFER_LOG_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        logger.info(f"تم تسجيل تحويل: من {sender_id} إلى {target_id} بمبلغ {amount}.") # # تسجيل العملية
+    except IOError as e:
+        logger.error(f"خطأ في كتابة ملف سجل التحويلات '{TRANSFER_LOG_FILE}': {e}", exc_info=True)
+    except Exception as e:
+        logger.error(f"خطأ غير متوقع عند تسجيل التحويل: {e}", exc_info=True)
 
 # ✅ عند الضغط على زر "تحويل الرصيد"
 async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -40,6 +55,7 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     balance = get_user_balance(user_id)
 
     if user_id in ADMIN_IDS:
+        logger.warning(f"المشرف {user_id} حاول استخدام خيار تحويل الرصيد الخاص بالمستخدمين.") # # تسجيل تحذير
         await update.callback_query.message.edit_text(
             "⚠️ هذا الخيار مخصص فقط للمستخدمين.\n"
             "🔋 لشحن رصيد مستخدم، استخدم القسم المخصص لذلك في لوحة التحكم.",
@@ -79,33 +95,24 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text("❌ الصيغة غير صحيحة. استخدم:\n<code>123456789 20</code>", parse_mode="HTML")
         return
 
+   # ...
     try:
         target_id = int(parts[0])
         amount = float(parts[1])
-    except ValueError:
-        await update.message.reply_text("❌ تأكد من أن المعرف والمبلغ أرقام صحيحة.")
+    except ValueError as e: # # تحديد نوع الخطأ
+        logger.warning(f"المستخدم {user_id} أدخل تنسيقًا غير صالح للتحويل: '{text}'. الخطأ: {e}") # # تسجيل تحذير
+        await update.message.reply_text("❌ الصيغة غير صحيحة. استخدم:\n<code>123456789 20</code>", parse_mode="HTML")
         return
-
-    if target_id == user_id:
-        await update.message.reply_text("❌ لا يمكنك تحويل الرصيد إلى نفسك.")
+# ...
+    try:
+        update_balance(user_id, -total)
+        update_balance(target_id, amount)
+        log_transfer(user_id, target_id, amount, fee)
+        logger.info(f"المستخدم {user_id} حول {amount} إلى {target_id}. الرصيد الجديد: {get_user_balance(user_id)}.") # # تسجيل نجاح العملية
+    except Exception as e: # # أي خطأ آخر
+        logger.error(f"خطأ أثناء تنفيذ تحويل الرصيد من {user_id} إلى {target_id} بمبلغ {amount}: {e}", exc_info=True) # # تسجيل خطأ
+        await update.message.reply_text("❌ حدث خطأ غير متوقع أثناء عملية التحويل. يرجى التواصل مع الدعم.", reply_markup=contact_admin_button())
         return
-
-    balance = get_user_balance(user_id)
-    fee = round(amount * 0.01, 2)
-    total = round(amount + fee, 2)
-
-    if balance < total:
-        await update.message.reply_text(
-            f"❌ رصيدك غير كافٍ.\nرصيدك: {balance} ر.س\nالمطلوب: {total} ر.س\n\n"
-            "💬 تواصل مع الدعم عبر الزر:",
-            parse_mode="HTML",
-            reply_markup=contact_admin_button()
-        )
-        return
-
-    update_balance(user_id, -total)
-    update_balance(target_id, amount)
-    log_transfer(user_id, target_id, amount, fee)
 
     await update.message.reply_text(
         f"✅ تم تحويل <b>{amount} ر.س</b> إلى المستخدم <b>{target_id}</b>.\n"
@@ -115,7 +122,7 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
     )
     context.user_data["transfer_stage"] = False
 
-# ✅ عرض سجل التحويلات (للمشرفين فقط)
+
 # ✅ عرض سجل التحويلات (للمشرفين فقط)
 async def show_transfer_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -128,6 +135,13 @@ async def show_transfer_logs(update: Update, context: ContextTypes.DEFAULT_TYPE)
         with open(TRANSFER_LOG_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
     except FileNotFoundError:
+        logger.warning(f"ملف سجل التحويلات '{TRANSFER_LOG_FILE}' غير موجود عند محاولة عرضه.") # # تسجيل تحذير
+        data = []
+    except json.JSONDecodeError:
+        logger.error(f"ملف سجل التحويلات '{TRANSFER_LOG_FILE}' تالف.", exc_info=True) # # تسجيل خطأ
+        data = []
+    except Exception as e:
+        logger.error(f"خطأ غير متوقع عند محاولة عرض سجل التحويلات: {e}", exc_info=True) # # تسجيل خطأ
         data = []
 
     if not data:
@@ -184,6 +198,8 @@ async def clear_all_transfers(update: Update, context: ContextTypes.DEFAULT_TYPE
         with open(TRANSFER_LOG_FILE, "w", encoding="utf-8") as f:
             json.dump([], f)
         await update.callback_query.message.edit_text("✅ تم حذف جميع سجل التحويلات.")
+        logger.info(f"المشرف {user_id} قام بحذف جميع سجلات التحويلات.") # # تسجيل نجاح
     except Exception as e:
-        await update.callback_query.message.edit_text("❌ حدث خطأ أثناء الحذف.")
+        logger.error(f"المشرف {user_id} فشل في حذف سجل التحويلات: {e}", exc_info=True) # # تسجيل خطأ
+        await update.callback_query.message.edit_text("❌ حدث خطأ أثناء الحذف. يرجى مراجعة سجلات البوت.")
 
