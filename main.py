@@ -1,3 +1,5 @@
+# main.py
+
 import logging
 from utils.logger import setup_logging
 
@@ -17,7 +19,7 @@ from handlers.transfer_handler import (
     show_transfer_logs,
     confirm_clear_transfers,
     clear_all_transfers,
-    confirm_transfer # # تم التأكد من استيراد هذه الدالة هنا
+    confirm_transfer
 )
 from handlers.profile_handler import (
     handle_withdraw_request,
@@ -36,7 +38,7 @@ from handlers.language_handler import show_language_options, set_language
 from handlers.main_menu import plus, go_to_buy_number
 from handlers.main_dashboard import show_dashboard, handle_recharge, handle_recharge_admin
 
-# ✅ إدارة المستخدمين
+# إدارة المستخدمين
 from handlers.admin_users import (
     handle_admin_users,
     handle_admin_search,
@@ -45,11 +47,11 @@ from handlers.admin_users import (
     handle_edit_user_balance,
     receive_balance_input,
     confirm_delete_user,
-    back_to_dashboard_clear_admin_search # # تم التأكد من استيراد هذه الدالة هنا
+    back_to_dashboard_clear_admin_search
 )
 
 
-# ✅ ربح رصيد مجانًا
+# ربح رصيد مجانًا
 from handlers.earn_credit_handler import show_earn_credit_page, view_referrals
 
 from utils.balance import add_balance, deduct_balance
@@ -67,14 +69,14 @@ from telegram.ext import (
     filters
 )
 
-# ✅ أزرار الاشتراك
+# أزرار الاشتراك
 def subscription_buttons():
     buttons = [[InlineKeyboardButton("🔁 تحقق من الاشتراك", callback_data="check_sub")]]
     for ch in REQUIRED_CHANNELS:
         buttons.append([InlineKeyboardButton(f"📢 اشترك في {ch}", url=f"https://t.me/{ch.lstrip('@')}")])
     return InlineKeyboardMarkup(buttons)
 
-# ✅ أمر /start
+# أمر /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if await is_user_subscribed(update, context):
         await update.message.reply_text("✅ تم التحقق من اشتراكك.\nاستخدم الأمر /plus للمتابعة.")
@@ -86,7 +88,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=subscription_buttons()
         )
 
-# ✅ زر التحقق
+# زر التحقق
 async def check_subscription_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -100,7 +102,7 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
             reply_markup=subscription_buttons()
         )
 
-# ✅ تشغيل البوت
+# تشغيل البوت
 def main():
     setup_logging()
     logger = logging.getLogger(__name__)
@@ -145,14 +147,14 @@ def main():
     app.add_handler(CallbackQueryHandler(show_transfer_logs, pattern="^view_transfer_logs$"))
     app.add_handler(CallbackQueryHandler(confirm_clear_transfers, pattern="^confirm_clear_transfers$"))
     app.add_handler(CallbackQueryHandler(clear_all_transfers, pattern="^clear_transfers$"))
-    app.add_handler(CallbackQueryHandler(confirm_transfer, pattern="^confirm_transfer_")) # # يجب أن يكون هذا السطر موجوداً
+    app.add_handler(CallbackQueryHandler(confirm_transfer, pattern="^confirm_transfer_"))
     app.add_handler(CallbackQueryHandler(show_balance_only, pattern="^check_balance$"))
     app.add_handler(CallbackQueryHandler(show_available_platforms, pattern="^available_platforms$"))
     app.add_handler(CallbackQueryHandler(handle_withdraw_request, pattern="^withdraw_request$"))
     app.add_handler(CallbackQueryHandler(handle_favorites, pattern="^favorites$"))
     app.add_handler(CallbackQueryHandler(add_to_favorites, pattern="^fav_"))
 
-    # ✅ ربح رصيد مجانًا
+    # ربح رصيد مجانًا
     app.add_handler(CallbackQueryHandler(show_earn_credit_page, pattern="^earn_credit$"))
     app.add_handler(CallbackQueryHandler(view_referrals, pattern="^view_referrals$"))
 
@@ -162,13 +164,16 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_delete_user, pattern="^delete_user_confirmed_"))
     app.add_handler(CallbackQueryHandler(handle_edit_user_balance, pattern="^edit_"))
     app.add_handler(CallbackQueryHandler(confirm_delete_user, pattern="^confirm_delete_"))
-    app.add_handler(CallbackQueryHandler(back_to_dashboard_clear_admin_search, pattern="^back_to_dashboard_clear_admin_search$")) # # إضافة هذا السطر الجديد
+    app.add_handler(CallbackQueryHandler(back_to_dashboard_clear_admin_search, pattern="^back_to_dashboard_clear_admin_search$"))
     
     # استلام البيانات (هذه المعالجات يجب أن تكون في نهاية قائمة MessageHandler)
     # ترتيبها مهم: المعالجات الأكثر تحديداً يجب أن تكون أولاً
+    # يجب أن يكون handle_transfer_input قبل handle_admin_search و receive_balance_input
+    # لأنه يستخدم "awaiting_input" كحالة خاصة به
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_transfer_input))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, receive_balance_input))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_admin_search))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_transfer_input)) # # هذا السطر كان مفقوداً أو غير صحيح
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_input)) # تأكد أن هذا لا يتعارض بشكل مباشر
 
 
     # كن وكيلا معنا
