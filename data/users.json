@@ -3,9 +3,10 @@
     "balance": 1000.0
   },
   "6366374333": {
-    "balance": 979.8
+    "balance": 959.6
   },
   "123456789": {
-    "balance": 20.0
+    "balance": 40.0,
+    "banned": false
   }
 }
