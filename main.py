@@ -15,7 +15,6 @@ from handlers.category_handler import (
 )
 from handlers.transfer_handler import (
     start_transfer,
-    handle_transfer_input,
     show_transfer_logs,
     confirm_clear_transfers,
     clear_all_transfers,
@@ -32,7 +31,12 @@ from handlers.agent_handler import show_agent_info, apply_as_agent
 from handlers.favorites_handler import add_to_favorites, handle_favorites
 from handlers.category_handler import show_available_platforms
 from handlers.offers_handler import show_general_offers, show_whatsapp_offers, show_telegram_offers
-from handlers.quick_search_handler import start_quick_search, handle_text_input
+from handlers.quick_search_handler import ( 
+    start_quick_search, 
+    handle_text_input, 
+    # # تم إزالة handle_quick_search_platform_selection لأنها لن تستخدم
+    # # في البحث العام
+)
 from handlers.help_handler import handle_usage_guide, handle_contact_support, handle_faq, handle_help
 from handlers.language_handler import show_language_options, set_language
 from handlers.main_menu import plus, go_to_buy_number
@@ -41,14 +45,15 @@ from handlers.main_dashboard import show_dashboard, handle_recharge, handle_rech
 # إدارة المستخدمين
 from handlers.admin_users import (
     handle_admin_users,
-    handle_admin_search,
     handle_block_user,
     handle_delete_user,
     handle_edit_user_balance,
-    receive_balance_input,
     confirm_delete_user,
     back_to_dashboard_clear_admin_search
 )
+
+# # استيراد الموجه الجديد
+from handlers.input_router import handle_all_text_input
 
 
 # ربح رصيد مجانًا
@@ -153,6 +158,9 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_withdraw_request, pattern="^withdraw_request$"))
     app.add_handler(CallbackQueryHandler(handle_favorites, pattern="^favorites$"))
     app.add_handler(CallbackQueryHandler(add_to_favorites, pattern="^fav_"))
+    
+    # # تم إزالة هذا المعالج لأنه لم يعد مطلوباً في البحث العام
+    # app.add_handler(CallbackQueryHandler(handle_quick_search_platform_selection, pattern="^quick_search_select_app_"))
 
     # ربح رصيد مجانًا
     app.add_handler(CallbackQueryHandler(show_earn_credit_page, pattern="^earn_credit$"))
@@ -166,14 +174,8 @@ def main():
     app.add_handler(CallbackQueryHandler(confirm_delete_user, pattern="^confirm_delete_"))
     app.add_handler(CallbackQueryHandler(back_to_dashboard_clear_admin_search, pattern="^back_to_dashboard_clear_admin_search$"))
     
-    # استلام البيانات (هذه المعالجات يجب أن تكون في نهاية قائمة MessageHandler)
-    # ترتيبها مهم: المعالجات الأكثر تحديداً يجب أن تكون أولاً
-    # يجب أن يكون handle_transfer_input قبل handle_admin_search و receive_balance_input
-    # لأنه يستخدم "awaiting_input" كحالة خاصة به
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_transfer_input))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, receive_balance_input))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_admin_search))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_input)) # تأكد أن هذا لا يتعارض بشكل مباشر
+    # # المعالج الوحيد للمدخلات النصية العامة
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_all_text_input))
 
 
     # كن وكيلا معنا
