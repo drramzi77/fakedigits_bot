@@ -1,3 +1,6 @@
+import logging #
+from utils.logger import setup_logging #
+
 from handlers.category_handler import (
     handle_category_selection,
     handle_most_available_countries,
@@ -95,6 +98,8 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
 
 # ✅ تشغيل البوت
 def main():
+    setup_logging() # # استدعاء تهيئة الـ logging هنا
+    logger = logging.getLogger(__name__) #
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     # أوامر
@@ -161,7 +166,7 @@ def main():
     app.add_handler(CallbackQueryHandler(show_agent_info, pattern="^become_agent$"))
     app.add_handler(CallbackQueryHandler(apply_as_agent, pattern="^apply_agent$"))
 
-    print("✅ البوت يعمل الآن...")
+    logger.info("✅ البوت يعمل الآن...") # # غير print() إلى logger.info()
     app.run_polling()
 
 if __name__ == "__main__":
