@@ -5,6 +5,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.balance import get_user_balance, set_user_balance
 from handlers.main_dashboard import show_dashboard
+import config 
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +43,32 @@ def save_users(users):
 
 # ✅ عرض قائمة المستخدمين مع خيارات الإدارة (بحث، تعديل، حظر، حذف)
 async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in config.ADMINS:
+        if update.callback_query:
+            await update.callback_query.answer("❌ غير مصرح لك.", show_alert=True)
+        else:
+            await update.message.reply_text("❌ ليس لديك صلاحية للوصول إلى هذه الميزة.")
+        logger.warning(f"المستخدم {user_id} حاول الوصول إلى إدارة المستخدمين بدون صلاحية.")
+        return
+
     query = update.callback_query
     if query:
         await query.answer()
+        # # تنظيف حالات user_data المتعلقة بانتظار المدخلات الأخرى
+        context.user_data.pop("transfer_stage", None)
+        context.user_data.pop("awaiting_country_input", None)
+        context.user_data.pop("quick_search_platform_selection", None)
+        context.user_data.pop("edit_balance_mode", None)
+        context.user_data.pop("selected_platform", None)
+        context.user_data.pop("awaiting_input", None) # # مسح حالة التوجيه العامة
+
         context.user_data["admin_search_mode"] = True
+        context.user_data["awaiting_input"] = "admin_user_search" # # ضبط حالة التوجيه العامة
+        context.user_data.pop("admin_search", None) 
+        message_editor = query.edit_message_text
+    else:
+        message_editor = update.message.reply_text
 
     users = load_users()
     search_term = context.user_data.get("admin_search", "").lower()
@@ -61,17 +84,18 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
         reply_markup = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard_clear_admin_search")]
         ])
-        if query:
-            await query.edit_message_text(message_text, reply_markup=reply_markup)
-        else:
-            await update.message.reply_text(message_text, reply_markup=reply_markup)
+        await message_editor(message_text, reply_markup=reply_markup)
         logger.info(f"لا يوجد مستخدمون مطابقون لـ '{search_term}'.")
         return
 
     text = "<b>👥 إدارة المستخدمين</b>\n\n"
+    if search_term:
+        text += f"نتائج البحث عن: '{search_term}'\n\n"
+    text += "أدخل ID أو اسم المستخدم للبحث، أو اختر إجراء:\n\n" 
+
     buttons = []
 
-    for uid, name, balance, banned in results[:10]:
+    for uid, name, balance, banned in results[:10]: 
         ban_status = "🚫 محظور" if banned else "✅ نشط"
         text += f"👤 <b>{name}</b> | 🆔 {uid}\n💰 {balance} ر.س | {ban_status}\n\n"
         row = [
@@ -83,43 +107,52 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     buttons.append([InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard_clear_admin_search")])
     
-    if query:
-        await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
-    else:
-        await update.message.reply_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
+    await message_editor(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
     logger.info(f"تم عرض قائمة المستخدمين الإدارية لـ '{search_term}'.")
 
 
 # ✅ دعم البحث داخل الإدارة باسم المستخدم أو الـ ID
 async def handle_admin_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # # هذه الدالة يتم استدعاؤها فقط من الموجه (input_router)
     user_id = update.effective_user.id
-    import config # # استيراد ADMINS من config.py
     if user_id not in config.ADMINS:
-        await update.message.reply_text("❌ ليس لديك صلاحية للبحث في قائمة المستخدمين.")
-        logger.warning(f"المستخدم {user_id} حاول البحث في قائمة المستخدمين بدون صلاحية.")
-        return
+        logger.warning(f"المستخدم {user_id} حاول البحث في قائمة المستخدمين بدون صلاحية (عبر الموجه).")
+        # # لا حاجة للرد هنا، الموجه سيتولى الرد أو التجاهل
+        return 
 
-    if context.user_data.get("admin_search_mode"):
-        context.user_data["admin_search"] = update.message.text.strip()
-        logger.info(f"المشرف {user_id} يبحث عن: '{context.user_data['admin_search']}'.")
-        await handle_admin_users(update, context)
-        context.user_data.pop("admin_search_mode", None)
-        context.user_data.pop("admin_search", None)
-    else:
-        logger.debug(f"تجاهل رسالة البحث الإداري غير المتوقعة من {user_id}: {update.message.text}")
-        pass
+    context.user_data["admin_search"] = update.message.text.strip()
+    logger.info(f"المشرف {user_id} يبحث عن: '{context.user_data['admin_search']}'.")
+    # # لا تغير "admin_search_mode" هنا، لأن المستخدم قد يبحث أكثر من مرة ضمن نفس الوضع
+    await handle_admin_users(update, context)
+    # # لا حاجة للعودة بـ True/None هنا، الموجه هو من يحدد ذلك
+    return
 
 
 # ✅ بدء عملية تعديل رصيد مستخدم معين
 async def handle_edit_user_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in config.ADMINS:
+        if update.callback_query:
+            await update.callback_query.answer("❌ غير مصرح لك.", show_alert=True)
+        logger.warning(f"المستخدم {user_id} حاول الوصول لتعديل رصيد بدون صلاحية.")
+        return
+
     query = update.callback_query
     await query.answer()
 
+    # # تنظيف حالات user_data المتعلقة بانتظار المدخلات الأخرى
+    context.user_data.pop("transfer_stage", None)
+    context.user_data.pop("awaiting_country_input", None)
+    context.user_data.pop("quick_search_platform_selection", None)
+    context.user_data.pop("admin_search_mode", None)
+    context.user_data.pop("selected_platform", None)
+    context.user_data.pop("admin_search", None) # # مسح أي بحث إداري سابق
+
+    context.user_data["awaiting_input"] = "admin_balance_edit" # # ضبط حالة التوجيه العامة
+
     user_id_to_edit = query.data.split("_")[1]
     context.user_data["editing_user_id"] = user_id_to_edit
-    context.user_data["edit_balance_mode"] = True
-    context.user_data.pop("admin_search_mode", None)
-    context.user_data.pop("admin_search", None)
+    context.user_data["edit_balance_mode"] = True # # يمكن إزالة هذه إذا لم تعد تستخدمها
     logger.info(f"المشرف {update.effective_user.id} بدأ تعديل رصيد المستخدم: {user_id_to_edit}.")
 
     await query.edit_message_text(
@@ -129,43 +162,52 @@ async def handle_edit_user_balance(update: Update, context: ContextTypes.DEFAULT
 
 # ✅ استلام قيمة الرصيد الجديدة وتحديثها
 async def receive_balance_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.user_data.get("edit_balance_mode"):
-        new_balance_str = update.message.text.strip()
-        user_id = update.effective_user.id
+    # # هذه الدالة يتم استدعاؤها فقط من الموجه (input_router)
+    user_id = update.effective_user.id
+    if user_id not in config.ADMINS:
+        logger.warning(f"المستخدم {user_id} حاول تعديل رصيد مستخدمين بدون صلاحية (عبر الموجه).")
+        return 
 
-        if not new_balance_str.replace('.', '', 1).isdigit():
-            await update.message.reply_text("❌ الرجاء إدخال رقم صالح للرصيد.")
-            logger.warning(f"المشرف {user_id} أدخل رصيدًا غير صالح: '{new_balance_str}'.")
-            return
+    new_balance_str = update.message.text.strip()
+    
+    if not new_balance_str.replace('.', '', 1).isdigit():
+        await update.message.reply_text("❌ الرجاء إدخال رقم صالح للرصيد.")
+        logger.warning(f"المشرف {user_id} أدخل رصيدًا غير صالح: '{new_balance_str}'.")
+        return 
 
-        try:
-            new_balance = float(new_balance_str)
-        except ValueError:
-            await update.message.reply_text("❌ حدث خطأ في تحويل الرصيد. الرجاء إدخال رقم.")
-            logger.error(f"خطأ في تحويل '{new_balance_str}' إلى رقم عشري بواسطة المشرف {user_id}.", exc_info=True)
-            return
+    try:
+        new_balance = float(new_balance_str)
+    except ValueError:
+        await update.message.reply_text("❌ حدث خطأ في تحويل الرصيد. الرجاء إدخال رقم.")
+        logger.error(f"خطأ في تحويل '{new_balance_str}' إلى رقم عشري بواسطة المشرف {user_id}.", exc_info=True)
+        return 
 
-        user_id_to_edit = context.user_data.get("editing_user_id")
-        
-        users = load_users()
+    user_id_to_edit = context.user_data.get("editing_user_id")
+    
+    users = load_users()
 
-        if user_id_to_edit in users:
-            users[user_id_to_edit]["balance"] = round(new_balance, 2)
-            save_users(users)
-            await update.message.reply_text(f"✅ تم تعديل رصيد المستخدم {user_id_to_edit} إلى {new_balance} ر.س.")
-            logger.info(f"المشرف {user_id} عدّل رصيد المستخدم {user_id_to_edit} إلى {new_balance}.")
-        else:
-            await update.message.reply_text("❌ لم يتم العثور على المستخدم المطلوب تعديل رصيده.")
-            logger.warning(f"المشرف {user_id} حاول تعديل رصيد مستخدم غير موجود: {user_id_to_edit}.")
-
-        context.user_data["edit_balance_mode"] = False
-        context.user_data.pop("editing_user_id", None)
+    if user_id_to_edit in users:
+        users[user_id_to_edit]["balance"] = round(new_balance, 2)
+        save_users(users)
+        await update.message.reply_text(f"✅ تم تعديل رصيد المستخدم {user_id_to_edit} إلى {new_balance} ر.س.")
+        logger.info(f"المشرف {user_id} عدّل رصيد المستخدم {user_id_to_edit} إلى {new_balance}.")
     else:
-        pass
+        await update.message.reply_text("❌ لم يتم العثور على المستخدم المطلوب تعديل رصيده.")
+        logger.warning(f"المشرف {user_id} حاول تعديل رصيد مستخدم غير موجود: {user_id_to_edit}.")
+
+    context.user_data["edit_balance_mode"] = False
+    context.user_data.pop("editing_user_id", None)
+    # # لا حاجة للعودة بـ True/None هنا، الموجه هو من يحدد ذلك
 
 
 # ✅ تنفيذ الحظر أو فك الحظر
 async def handle_block_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in config.ADMINS:
+        await update.callback_query.answer("❌ غير مصرح لك.", show_alert=True)
+        logger.warning(f"المستخدم {user_id} حاول حظر/فك حظر بدون صلاحية.")
+        return
+
     query = update.callback_query
     await query.answer()
 
@@ -187,6 +229,12 @@ async def handle_block_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ✅ طلب تأكيد حذف المستخدم
 async def confirm_delete_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in config.ADMINS:
+        await update.callback_query.answer("❌ غير مصرح لك.", show_alert=True)
+        logger.warning(f"المستخدم {user_id} حاول طلب تأكيد حذف بدون صلاحية.")
+        return
+
     query = update.callback_query
     await query.answer()
 
@@ -210,6 +258,12 @@ async def confirm_delete_user(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 # ✅ تنفيذ الحذف النهائي للمستخدم (بعد التأكيد)
 async def handle_delete_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in config.ADMINS:
+        await update.callback_query.answer("❌ غير مصرح لك.", show_alert=True)
+        logger.warning(f"المستخدم {user_id} حاول حذف مستخدم بدون صلاحية.")
+        return
+
     query = update.callback_query
     await query.answer()
 
@@ -232,4 +286,5 @@ async def back_to_dashboard_clear_admin_search(update: Update, context: ContextT
     await query.answer()
     context.user_data.pop("admin_search_mode", None)
     context.user_data.pop("admin_search", None)
+    context.user_data.pop("awaiting_input", None) # # مسح حالة التوجيه العامة
     await show_dashboard(update, context)
