@@ -8,7 +8,7 @@ from utils.balance import get_user_balance, update_balance
 
 logger = logging.getLogger(__name__)
 
-ADMIN_IDS = [780028688]
+ADMIN_IDS = [780028688] # قائمة بـ IDs المشرفين
 TRANSFER_LOG_FILE = "data/transfers.json"
 
 # 🔘 زر تواصل مع الإدارة
@@ -38,6 +38,8 @@ def log_transfer(sender_id, target_id, amount, fee):
         data = []
     except FileNotFoundError:
         logger.warning(f"ملف سجل التحويلات '{TRANSFER_LOG_FILE}' غير موجود. سيتم إنشاؤه.")
+    except Exception as e:
+        logger.error(f"خطأ غير متوقع عند تحميل سجل التحويلات: {e}", exc_info=True)
 
     data.append(transfer)
     try:
@@ -53,6 +55,9 @@ def log_transfer(sender_id, target_id, amount, fee):
 async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     balance = get_user_balance(user_id)
+
+    # إضافة سجل للتحقق من استدعاء الدالة وحالة user_data
+    logger.info(f"start_transfer: المستخدم {user_id} ضغط على تحويل الرصيد. user_data قبل التعديل: {context.user_data}")
 
     if update.callback_query:
         await update.callback_query.answer()
@@ -84,6 +89,8 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message_editor(msg, parse_mode="HTML", reply_markup=contact_admin_button())
     else:
         context.user_data["transfer_stage"] = "awaiting_input"
+        # إضافة سجل للتحقق من تعيين الحالة
+        logger.info(f"start_transfer: تم تعيين transfer_stage لـ {user_id} إلى 'awaiting_input'. user_data بعد التعديل: {context.user_data}")
         await message_editor(
             f"💰 رصيدك الحالي: <b>{balance} ر.س</b>\n\n"
             "🔁 <b>تحويل الرصيد</b>\n\n"
@@ -103,6 +110,8 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ✅ معالجة مدخلات التحويل وطلب التأكيد
 async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    # إضافة سجل للتحقق من استدعاء الدالة وحالة user_data
+    logger.info(f"handle_transfer_input: المستخدم {user_id} أرسل نص: '{update.message.text}'. user_data: {context.user_data}")
 
     if context.user_data.get("transfer_stage") == "awaiting_input":
         text = update.message.text.strip()
@@ -172,6 +181,8 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
             "total_deduction": total_deduction
         }
         context.user_data["transfer_stage"] = "confirm_transfer"
+        # إضافة سجل للتحقق من تعيين الحالة وتفاصيل التحويل
+        logger.info(f"handle_transfer_input: تم تعيين transfer_stage لـ {user_id} إلى 'confirm_transfer' وتفاصيل التحويل: {context.user_data.get('transfer_details')}")
 
         confirmation_message = (
             f"🔁 <b>تأكيد تحويل الرصيد</b>\n\n"
@@ -196,7 +207,9 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
         )
         logger.info(f"المستخدم {user_id} على وشك تحويل {amount} إلى {target_id}. يطلب التأكيد.")
     else:
-        pass
+        # إضافة سجل للتأكد ما إذا كان المعالج يُستدعى خارج المرحلة الصحيحة
+        logger.debug(f"handle_transfer_input: المستخدم {user_id} أرسل نصًا ولكن ليس في مرحلة 'awaiting_input'. النص: '{update.message.text}', الحالة: {context.user_data.get('transfer_stage')}")
+        pass # دع الرسالة تمر إلى معالجات أخرى إذا لم تكن في مرحلة التحويل
 
 
 # ✅ تنفيذ التحويل الفعلي بعد التأكيد
@@ -204,6 +217,8 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
+    # إضافة سجل للتحقق من استدعاء الدالة وحالة user_data
+    logger.info(f"confirm_transfer: المستخدم {user_id} ضغط زر التأكيد: '{query.data}'. user_data: {context.user_data}")
 
     if context.user_data.get("transfer_stage") != "confirm_transfer":
         await query.edit_message_text(
