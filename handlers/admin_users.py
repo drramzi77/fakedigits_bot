@@ -4,7 +4,7 @@ import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.balance import get_user_balance, set_user_balance
-from handlers.main_dashboard import show_dashboard # # إضافة هذا السطر لاستخدامه في العودة
+from handlers.main_dashboard import show_dashboard
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     if query:
         await query.answer()
-        context.user_data["admin_search_mode"] = True # # تفعيل وضع البحث الإداري عند الدخول
+        context.user_data["admin_search_mode"] = True
 
     users = load_users()
     search_term = context.user_data.get("admin_search", "").lower()
@@ -59,7 +59,7 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not results:
         message_text = "❌ لا يوجد مستخدمون مطابقون."
         reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard_clear_admin_search")] # # استخدام زر العودة الجديد
+            [InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard_clear_admin_search")]
         ])
         if query:
             await query.edit_message_text(message_text, reply_markup=reply_markup)
@@ -81,7 +81,7 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ]
         buttons.append(row)
 
-    buttons.append([InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard_clear_admin_search")]) # # استخدام زر العودة الجديد
+    buttons.append([InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard_clear_admin_search")])
     
     if query:
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
@@ -93,21 +93,19 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ✅ دعم البحث داخل الإدارة باسم المستخدم أو الـ ID
 async def handle_admin_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    from config import ADMINS # # استيراد ADMINS من config.py
-    if user_id not in ADMINS:
+    import config # # استيراد ADMINS من config.py
+    if user_id not in config.ADMINS:
         await update.message.reply_text("❌ ليس لديك صلاحية للبحث في قائمة المستخدمين.")
         logger.warning(f"المستخدم {user_id} حاول البحث في قائمة المستخدمين بدون صلاحية.")
         return
 
-    # # تحقق ما إذا كان المستخدم في وضع البحث الإداري
     if context.user_data.get("admin_search_mode"):
         context.user_data["admin_search"] = update.message.text.strip()
         logger.info(f"المشرف {user_id} يبحث عن: '{context.user_data['admin_search']}'.")
         await handle_admin_users(update, context)
-        context.user_data.pop("admin_search_mode", None) # # إيقاف وضع البحث بعد البحث
-        context.user_data.pop("admin_search", None) # # مسح مصطلح البحث
+        context.user_data.pop("admin_search_mode", None)
+        context.user_data.pop("admin_search", None)
     else:
-        # # إذا كانت الرسالة ليست في وضع البحث الإداري، لا تفعل شيئًا (دعها تمر لمعالجات أخرى)
         logger.debug(f"تجاهل رسالة البحث الإداري غير المتوقعة من {user_id}: {update.message.text}")
         pass
 
@@ -120,7 +118,6 @@ async def handle_edit_user_balance(update: Update, context: ContextTypes.DEFAULT
     user_id_to_edit = query.data.split("_")[1]
     context.user_data["editing_user_id"] = user_id_to_edit
     context.user_data["edit_balance_mode"] = True
-    # # مسح وضع البحث الإداري عند بدء تعديل الرصيد
     context.user_data.pop("admin_search_mode", None)
     context.user_data.pop("admin_search", None)
     logger.info(f"المشرف {update.effective_user.id} بدأ تعديل رصيد المستخدم: {user_id_to_edit}.")
@@ -199,7 +196,7 @@ async def confirm_delete_user(update: Update, context: ContextTypes.DEFAULT_TYPE
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("✅ نعم، احذف", callback_data=f"delete_user_confirmed_{user_id_to_delete}"),
-            InlineKeyboardButton("❌ إلغاء", callback_data="admin_users") # # العودة إلى قائمة الإدارة
+            InlineKeyboardButton("❌ إلغاء", callback_data="admin_users")
         ]
     ])
 
@@ -235,4 +232,4 @@ async def back_to_dashboard_clear_admin_search(update: Update, context: ContextT
     await query.answer()
     context.user_data.pop("admin_search_mode", None)
     context.user_data.pop("admin_search", None)
-    await show_dashboard(update, context) # # استخدام show_dashboard للعودة
+    await show_dashboard(update, context)
