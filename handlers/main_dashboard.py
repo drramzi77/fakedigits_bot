@@ -7,14 +7,13 @@ from utils.check_balance import get_user_balance  # ✅ لاستدعاء الر�
 async def show_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
-    balance = get_user_balance(user_id)
+    balance = get_user_balance(user_id) #
 
     # الاسم الظاهر (username أو الاسم الكامل)
     display_name = user.username if user.username else f"{user.first_name} {user.last_name or ''}"
 
     message = (
-        f"🏠 <b>القائمة الرئيسية</b>\n\n"
-        f"👤 <b>المستخدم:</b> {display_name}\n"
+        f"👋 أهلاً بك يا <b>{display_name}</b> في لوحة تحكمك الرئيسية! 😊\n\n" # التعديل هنا
         f"🆔 <b>ID:</b> <code>{user_id}</code>\n"
         f"💰 <b>الرصيد:</b> {balance} ر.س\n\n"
         f"📢 اشترك في @FakeDigitsPlus\n"
@@ -23,11 +22,11 @@ async def show_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if update.callback_query:
         await update.callback_query.message.edit_text(
-            message, reply_markup=dashboard_keyboard(user_id), parse_mode="HTML"
+            message, reply_markup=dashboard_keyboard(user_id), parse_mode="HTML" #
         )
     elif update.message:
         await update.message.reply_text(
-            message, reply_markup=dashboard_keyboard(user_id), parse_mode="HTML"
+            message, reply_markup=dashboard_keyboard(user_id), parse_mode="HTML" #
         )
 
 
