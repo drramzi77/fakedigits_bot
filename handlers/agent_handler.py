@@ -1,6 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from config import ADMINS as ADMIN_IDS
+from config import ADMINS # ✅ تم التعديل ليصبح استيراد مباشر لـ ADMINS
 
 # ✅ صفحة كن وكيلاً معنا
 async def show_agent_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -48,7 +48,7 @@ async def apply_as_agent(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🆔 ID: <code>{user.id}</code>\n"
     )
 
-    for admin_id in ADMIN_IDS:
+    for admin_id in ADMINS:
         await context.bot.send_message(chat_id=admin_id, text=msg, parse_mode="HTML")
 
     await query.message.edit_text(

@@ -1,7 +1,7 @@
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from config import ADMINS
 
-# ✅ اكتب هنا معرفات المشرفين
-ADMIN_IDS = [780028688]  # ضع هنا معرفات المشرفين إن وجدت
+
 
 def dashboard_keyboard(user_id=None):
     buttons = [
@@ -49,7 +49,7 @@ def dashboard_keyboard(user_id=None):
     ]
 
     # ✅ إضافة عناصر خاصة للمشرفين فقط
-    if user_id in ADMIN_IDS:
+    if user_id in ADMINS:
         buttons.insert(4, [InlineKeyboardButton("📜 عرض التحويلات السابقة", callback_data="view_transfer_logs")])
         buttons.insert(5, [InlineKeyboardButton("🛠️ إدارة المستخدمين", callback_data="admin_users")])
 

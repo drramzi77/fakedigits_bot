@@ -2,16 +2,14 @@ import json
 import os
 import logging
 import re
-from telegram import Update # # يجب إضافة هذا السطر
-from telegram.ext import ContextTypes # # يجب إضافة هذا السطر
+from telegram import Update
+from telegram.ext import ContextTypes
+from config import ADMINS # ✅ تم إضافة هذا السطر لاستيراد ADMINS من config.py
 
 logger = logging.getLogger(__name__)
 
-# ✅ معرفات المسؤولين
-ADMIN_IDS = [780028688]
-
 # ✅ ملف المستخدمين
-USER_FILE = "data/users.json"
+USER_FILE = "data/users.json" #
 
 # ✅ جلب الرصيد الحالي
 def get_user_balance(user_id: int) -> float:
@@ -82,13 +80,13 @@ def update_balance(user_id: int, amount: float):
 async def add_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
-    if user_id not in ADMIN_IDS:
+    if user_id not in ADMINS: # ✅ تم التعديل من ADMIN_IDS إلى ADMINS
         await update.message.reply_text("❌ هذا الأمر مخصص فقط للمسؤولين.")
         return
 
     target_user_id_str = None
     amount = 0.0
-    
+
     if not context.args:
         target_user_id_str = str(user_id)
         amount = 100
@@ -136,7 +134,7 @@ async def add_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def deduct_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
-    if user_id not in ADMIN_IDS:
+    if user_id not in ADMINS: # ✅ تم التعديل من ADMIN_IDS إلى ADMINS
         await update.message.reply_text("❌ هذا الأمر مخصص فقط للمسؤولين.")
         return
 

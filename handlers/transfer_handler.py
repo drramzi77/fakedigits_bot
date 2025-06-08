@@ -7,10 +7,10 @@ from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.balance import get_user_balance, update_balance
+from config import ADMINS
 
 logger = logging.getLogger(__name__)
 
-ADMIN_IDS = [780028688] # قائمة بـ IDs المشرفين
 TRANSFER_LOG_FILE = "data/transfers.json"
 
 # 🔘 زر تواصل مع الإدارة
@@ -67,7 +67,7 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         message_editor = update.message.reply_text
 
-    if user_id in ADMIN_IDS:
+    if user_id in ADMINS:
         logger.warning(f"المشرف {user_id} حاول استخدام خيار تحويل الرصيد الخاص بالمستخدمين.")
         await message_editor(
             "⚠️ هذا الخيار مخصص فقط للمستخدمين.\n"
@@ -312,7 +312,7 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def show_transfer_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
-    if user_id not in ADMIN_IDS:
+    if user_id not in ADMINS:
         await update.callback_query.answer("❌ لا تملك صلاحية الوصول لهذا السجل.", show_alert=True)
         return
 
@@ -360,7 +360,7 @@ async def show_transfer_logs(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def confirm_clear_transfers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if user_id not in ADMIN_IDS:
+    if user_id not in ADMINS:
         await update.callback_query.answer("❌ غير مصرح لك.", show_alert=True)
         logger.warning(f"المستخدم {user_id} حاول تأكيد حذف التحويلات بدون صلاحية.")
         return
@@ -381,7 +381,7 @@ async def confirm_clear_transfers(update: Update, context: ContextTypes.DEFAULT_
 
 async def clear_all_transfers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if user_id not in ADMIN_IDS:
+    if user_id not in ADMINS:
         await update.callback_query.answer("❌ غير مصرح لك.", show_alert=True)
         logger.warning(f"المستخدم {user_id} حاول حذف جميع التحويلات بدون صلاحية.")
         return
