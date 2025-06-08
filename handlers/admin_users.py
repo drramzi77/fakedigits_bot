@@ -1,11 +1,12 @@
 import json
 import logging
 import os
-from datetime import datetime # ✅ استيراد datetime
+from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.balance import get_user_balance, set_user_balance
 from handlers.main_dashboard import show_dashboard
+import config # ✅ هذا الاستيراد صحيح ويتم استخدامه كـ config.ADMINS
 
 logger = logging.getLogger(__name__)
 
@@ -55,8 +56,8 @@ def ensure_user_exists(user_id: int, user_info: dict):
             "username": user_info.get("username", ""),
             "language_code": user_info.get("language_code", "N/A"),
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "balance": 0.0, # ✅ رصيد أولي 0
-            "banned": False # افتراضياً غير محظور
+            "balance": 0.0,
+            "banned": False
         }
         save_users(users)
         logger.info(f"تم تسجيل مستخدم جديد: {user_id_str} ({user_info.get('username')}).")
@@ -74,7 +75,7 @@ def ensure_user_exists(user_id: int, user_info: dict):
         if current_user_data.get("username") != user_info.get("username", ""):
             current_user_data["username"] = user_info.get("username", "")
             updated = True
-        
+
         if updated:
             save_users(users)
             logger.info(f"تم تحديث معلومات المستخدم {user_id_str}.")
@@ -85,7 +86,7 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     if query:
         await query.answer()
-        context.user_data["awaiting_input"] = "admin_user_search" # ✅ إضافة الحالة الجديدة للموجه
+        context.user_data["awaiting_input"] = "admin_user_search"
 
     users = load_users()
     search_term = context.user_data.get("admin_search", "").lower()
@@ -94,14 +95,14 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
     for uid, info in users.items():
         username = info.get("name", f"مستخدم {uid}")
         # إذا لم يكن هناك "name" في الملف، استخدم first_name + last_name
-        if "name" not in info: 
+        if "name" not in info:
             display_name = f"{info.get('first_name', '')} {info.get('last_name', '')}".strip()
             if not display_name:
                 display_name = f"مستخدم {uid}"
         else:
             display_name = username
 
-        if search_term in uid.lower() or (display_name and search_term in display_name.lower()) or (info.get("username") and search_term in info.get("username").lower()): # ✅ تحسين البحث ليشمل الاسم واليوزرنيم
+        if search_term in uid.lower() or (display_name and search_term in display_name.lower()) or (info.get("username") and search_term in info.get("username").lower()):
             results.append((uid, display_name, info.get("balance", 0), info.get("banned", False)))
 
     if not results:
@@ -131,7 +132,7 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
         buttons.append(row)
 
     buttons.append([InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard_clear_admin_search")])
-    
+
     if query:
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
     else:
@@ -142,8 +143,8 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ✅ دعم البحث داخل الإدارة باسم المستخدم أو الـ ID
 async def handle_admin_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    import config
-    if user_id not in config.ADMINS:
+    # هنا تم الاستيراد الصحيح لـ ADMINS من config
+    if user_id not in config.ADMINS: # ✅ هذا الاستخدام صحيح
         await update.message.reply_text("❌ ليس لديك صلاحية للبحث في قائمة المستخدمين.")
         logger.warning(f"المستخدم {user_id} حاول البحث في قائمة المستخدمين بدون صلاحية.")
         context.user_data.pop("awaiting_input", None)
@@ -196,7 +197,7 @@ async def receive_balance_input(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     user_id_to_edit = context.user_data.get("editing_user_id")
-    
+
     users = load_users()
 
     if user_id_to_edit in users:

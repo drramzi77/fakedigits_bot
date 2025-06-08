@@ -48,7 +48,7 @@ async def apply_as_agent(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🆔 ID: <code>{user.id}</code>\n"
     )
 
-    for admin_id in ADMINS:
+    for admin_id in ADMINS: # ✅ تم التعديل من ADMIN_IDS إلى ADMINS
         await context.bot.send_message(chat_id=admin_id, text=msg, parse_mode="HTML")
 
     await query.message.edit_text(

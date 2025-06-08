@@ -1,10 +1,10 @@
 import json
-import logging # # إضافة هذا السطر
+import logging
 from telegram import Update
 from telegram.ext import ContextTypes
+from config import ADMINS # ✅ تم إضافة هذا السطر
 
-# ✅ معرفات المدراء
-ADMIN_IDS = [780028688]  # يمكنك إضافة المزيد داخل القائمة
+logger = logging.getLogger(__name__)
 
 # ✅ قراءة الرصيد من ملف users.json
 def get_user_balance(user_id: int) -> float:
@@ -39,7 +39,7 @@ async def check_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # إذا تم تمرير معرف مستخدم، تحقق من صلاحية المدير
-    if requester_id in ADMIN_IDS and len(context.args) == 1:
+    if requester_id in ADMINS and len(context.args) == 1: # ✅ تم التعديل من ADMIN_IDS إلى ADMINS
         try:
             target_id = int(context.args[0])
             balance = get_user_balance(target_id)

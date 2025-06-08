@@ -1,5 +1,3 @@
-# handlers/transfer_handler.py
-
 import json
 import logging
 import os
@@ -7,7 +5,7 @@ from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.balance import get_user_balance, update_balance
-from config import ADMINS
+from config import ADMINS # ✅ تم إضافة هذا السطر
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +65,7 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         message_editor = update.message.reply_text
 
-    if user_id in ADMINS:
+    if user_id in ADMINS: # ✅ تم التعديل من ADMIN_IDS إلى ADMINS
         logger.warning(f"المشرف {user_id} حاول استخدام خيار تحويل الرصيد الخاص بالمستخدمين.")
         await message_editor(
             "⚠️ هذا الخيار مخصص فقط للمستخدمين.\n"
@@ -127,8 +125,8 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
                 [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
             ])
         )
-        context.user_data.pop("transfer_stage", None) # ✅ مسح الحالة
-        context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة
+        context.user_data.pop("transfer_stage", None)
+        context.user_data.pop("awaiting_input", None)
         logger.warning(f"المستخدم {user_id} أدخل تنسيقًا غير صالح للتحويل: '{text}'.")
         return
 
@@ -143,8 +141,8 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
                 [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
             ])
         )
-        context.user_data.pop("transfer_stage", None) # ✅ مسح الحالة
-        context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة
+        context.user_data.pop("transfer_stage", None)
+        context.user_data.pop("awaiting_input", None)
         return
 
     if target_id == user_id:
@@ -154,8 +152,8 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
                 [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
             ])
         )
-        context.user_data.pop("transfer_stage", None) # ✅ مسح الحالة
-        context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة
+        context.user_data.pop("transfer_stage", None)
+        context.user_data.pop("awaiting_input", None)
         logger.warning(f"المستخدم {user_id} حاول تحويل الرصيد إلى نفسه.")
         return
 
@@ -166,8 +164,8 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
                 [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
             ])
         )
-        context.user_data.pop("transfer_stage", None) # ✅ مسح الحالة
-        context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة
+        context.user_data.pop("transfer_stage", None)
+        context.user_data.pop("awaiting_input", None)
         logger.warning(f"المستخدم {user_id} حاول تحويل مبلغ غير موجب: {amount}.")
         return
 
@@ -181,8 +179,8 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
             parse_mode="HTML",
             reply_markup=contact_admin_button()
         )
-        context.user_data.pop("transfer_stage", None) # ✅ مسح الحالة
-        context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة
+        context.user_data.pop("transfer_stage", None)
+        context.user_data.pop("awaiting_input", None)
         logger.info(f"المستخدم {user_id} ليس لديه رصيد كافٍ لتحويل {amount} إلى {target_id}. الرصيد: {balance}.")
         return
 
@@ -192,7 +190,7 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
         "fee": fee,
         "total_deduction": total_deduction
     }
-    context.user_data["transfer_stage"] = "confirm_transfer" # الحالة القديمة
+    context.user_data["transfer_stage"] = "confirm_transfer"
     # لا تمسح awaiting_input هنا، لأن المستخدم سيضغط على زر التأكيد/الإلغاء وليس نصًا آخر
 
     confirmation_message = (
@@ -237,7 +235,7 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.warning(f"المستخدم {user_id} حاول تأكيد تحويل في مرحلة غير صحيحة.")
         context.user_data.pop("transfer_stage", None)
         context.user_data.pop("transfer_details", None)
-        context.user_data.pop("awaiting_input", None) # ✅ مسح حالة awaiting_input
+        context.user_data.pop("awaiting_input", None)
         return
 
     if query.data == "confirm_transfer_yes":
@@ -251,7 +249,7 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             logger.error(f"المستخدم {user_id} حاول تأكيد تحويل بدون تفاصيل. محتمل خطأ منطقي.")
             context.user_data.pop("transfer_stage", None)
-            context.user_data.pop("awaiting_input", None) # ✅ مسح حالة awaiting_input
+            context.user_data.pop("awaiting_input", None)
             return
 
         target_id = details["target_id"]
@@ -269,7 +267,7 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.warning(f"المستخدم {user_id} أكد التحويل لكن رصيده أصبح غير كافٍ. الحالي: {current_balance}.")
             context.user_data.pop("transfer_stage", None)
             context.user_data.pop("transfer_details", None)
-            context.user_data.pop("awaiting_input", None) # ✅ مسح حالة awaiting_input
+            context.user_data.pop("awaiting_input", None)
             return
 
         try:
@@ -293,7 +291,7 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "❌ حدث خطأ غير متوقع أثناء عملية التحويل بعد التأكيد. يرجى التواصل مع الدعم.",
                 reply_markup=contact_admin_button()
             )
-        
+
     elif query.data == "confirm_transfer_no":
         await query.edit_message_text(
             "❌ تم إلغاء عملية التحويل.",
@@ -305,14 +303,14 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data.pop("transfer_stage", None)
     context.user_data.pop("transfer_details", None)
-    context.user_data.pop("awaiting_input", None) # ✅ مسح حالة awaiting_input
+    context.user_data.pop("awaiting_input", None)
 
 
 # ✅ عرض سجل التحويلات (للمشرفين فقط)
 async def show_transfer_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
-    if user_id not in ADMINS:
+    if user_id not in ADMINS: # ✅ تم التعديل من ADMIN_IDS إلى ADMINS
         await update.callback_query.answer("❌ لا تملك صلاحية الوصول لهذا السجل.", show_alert=True)
         return
 
@@ -360,7 +358,7 @@ async def show_transfer_logs(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def confirm_clear_transfers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if user_id not in ADMINS:
+    if user_id not in ADMINS: # ✅ تم التعديل من ADMIN_IDS إلى ADMINS
         await update.callback_query.answer("❌ غير مصرح لك.", show_alert=True)
         logger.warning(f"المستخدم {user_id} حاول تأكيد حذف التحويلات بدون صلاحية.")
         return
@@ -381,7 +379,7 @@ async def confirm_clear_transfers(update: Update, context: ContextTypes.DEFAULT_
 
 async def clear_all_transfers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if user_id not in ADMINS:
+    if user_id not in ADMINS: # ✅ تم التعديل من ADMIN_IDS إلى ADMINS
         await update.callback_query.answer("❌ غير مصرح لك.", show_alert=True)
         logger.warning(f"المستخدم {user_id} حاول حذف جميع التحويلات بدون صلاحية.")
         return
