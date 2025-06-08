@@ -1,11 +1,22 @@
 {
-  "780028688": {
-    "balance": 1000.0
-  },
   "6366374333": {
-    "balance": 838.4
+    "id": 6366374333,
+    "first_name": "Mad Love🌹❤",
+    "last_name": "",
+    "username": "",
+    "language_code": "ar",
+    "created_at": "2025-06-08 03:21:43",
+    "balance": 0.0,
+    "banned": false
   },
-  "123456789": {
-    "balance": 1020.0
+  "780028688": {
+    "id": 780028688,
+    "first_name": "Dr\\Ramzi 😊🌹",
+    "last_name": "",
+    "username": "DrRamzi0",
+    "language_code": "en",
+    "created_at": "2025-06-08 03:23:09",
+    "balance": 200.0,
+    "banned": false
   }
 }
