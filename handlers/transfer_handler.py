@@ -1,3 +1,5 @@
+# handlers/transfer_handler.py
+
 import json
 import logging
 import os
@@ -56,6 +58,7 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     balance = get_user_balance(user_id)
 
+    # إضافة سجل للتحقق من استدعاء الدالة وحالة user_data
     logger.info(f"start_transfer: المستخدم {user_id} ضغط على تحويل الرصيد. user_data قبل التعديل: {context.user_data}")
 
     if update.callback_query:
@@ -87,12 +90,10 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await message_editor(msg, parse_mode="HTML", reply_markup=contact_admin_button())
     else:
-        # # مسح جميع حالات الانتظار الأخرى وضبط الحالة الحالية
-        context.user_data.clear() # # مسح كل شيء لتجنب أي تعارضات سابقة
-        context.user_data["awaiting_input"] = "transfer_amount" # # تحديد نوع الإدخال المنتظر
-        context.user_data["transfer_stage"] = "awaiting_input" # # المرحلة القديمة للتحويل (يمكن إزالتها إذا تم إعادة هيكلة handle_transfer_input بالكامل)
-        
-        logger.info(f"start_transfer: تم تعيين awaiting_input لـ {user_id} إلى 'transfer_amount'. user_data بعد التعديل: {context.user_data}")
+        context.user_data["transfer_stage"] = "awaiting_input" # الحالة القديمة
+        context.user_data["awaiting_input"] = "transfer_amount" # ✅ الحالة الجديدة لموجه المدخلات
+        # إضافة سجل للتحقق من تعيين الحالة
+        logger.info(f"start_transfer: تم تعيين transfer_stage لـ {user_id} إلى 'awaiting_input' و awaiting_input إلى 'transfer_amount'. user_data بعد التعديل: {context.user_data}")
         await message_editor(
             f"💰 رصيدك الحالي: <b>{balance} ر.س</b>\n\n"
             "🔁 <b>تحويل الرصيد</b>\n\n"
@@ -112,16 +113,8 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ✅ معالجة مدخلات التحويل وطلب التأكيد
 async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    # إضافة سجل للتحقق من استدعاء الدالة وحالة user_data
     logger.info(f"handle_transfer_input: المستخدم {user_id} أرسل نص: '{update.message.text}'. user_data: {context.user_data}")
-
-    # # لم نعد نتحقق من awaiting_input هنا، لأن الموجه (router) قام بذلك بالفعل.
-    # # ولكن ما زلنا بحاجة إلى التحقق من transfer_stage للتحقق من سلامة العملية.
-    if context.user_data.get("transfer_stage") != "awaiting_input":
-        # # هذا يجب أن لا يحدث إذا كان الموجه يعمل بشكل صحيح
-        logger.warning(f"handle_transfer_input: تم استدعاء الدالة بشكل غير متوقع. user_data: {context.user_data}")
-        await update.message.reply_text("❌ حدث خطأ داخلي. يرجى البدء من جديد.")
-        context.user_data.clear()
-        return
 
     text = update.message.text.strip()
     parts = text.split()
@@ -134,8 +127,10 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
                 [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
             ])
         )
+        context.user_data.pop("transfer_stage", None) # ✅ مسح الحالة
+        context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة
         logger.warning(f"المستخدم {user_id} أدخل تنسيقًا غير صالح للتحويل: '{text}'.")
-        return # # لا نُرجع True هنا لأن الموجه هو من يحدد ذلك
+        return
 
     try:
         target_id = int(parts[0])
@@ -148,7 +143,9 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
                 [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
             ])
         )
-        return 
+        context.user_data.pop("transfer_stage", None) # ✅ مسح الحالة
+        context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة
+        return
 
     if target_id == user_id:
         await update.message.reply_text(
@@ -157,8 +154,10 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
                 [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
             ])
         )
+        context.user_data.pop("transfer_stage", None) # ✅ مسح الحالة
+        context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة
         logger.warning(f"المستخدم {user_id} حاول تحويل الرصيد إلى نفسه.")
-        return 
+        return
 
     if amount <= 0:
         await update.message.reply_text(
@@ -167,8 +166,10 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
                 [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
             ])
         )
+        context.user_data.pop("transfer_stage", None) # ✅ مسح الحالة
+        context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة
         logger.warning(f"المستخدم {user_id} حاول تحويل مبلغ غير موجب: {amount}.")
-        return 
+        return
 
     balance = get_user_balance(user_id)
     fee = round(amount * 0.01, 2)
@@ -180,8 +181,10 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
             parse_mode="HTML",
             reply_markup=contact_admin_button()
         )
+        context.user_data.pop("transfer_stage", None) # ✅ مسح الحالة
+        context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة
         logger.info(f"المستخدم {user_id} ليس لديه رصيد كافٍ لتحويل {amount} إلى {target_id}. الرصيد: {balance}.")
-        return 
+        return
 
     context.user_data["transfer_details"] = {
         "target_id": target_id,
@@ -189,8 +192,8 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
         "fee": fee,
         "total_deduction": total_deduction
     }
-    context.user_data["transfer_stage"] = "confirm_transfer"
-    logger.info(f"handle_transfer_input: تم تعيين transfer_stage لـ {user_id} إلى 'confirm_transfer' وتفاصيل التحويل: {context.user_data.get('transfer_details')}")
+    context.user_data["transfer_stage"] = "confirm_transfer" # الحالة القديمة
+    # لا تمسح awaiting_input هنا، لأن المستخدم سيضغط على زر التأكيد/الإلغاء وليس نصًا آخر
 
     confirmation_message = (
         f"🔁 <b>تأكيد تحويل الرصيد</b>\n\n"
@@ -214,13 +217,14 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
         parse_mode="HTML"
     )
     logger.info(f"المستخدم {user_id} على وشك تحويل {amount} إلى {target_id}. يطلب التأكيد.")
-    return 
+
 
 # ✅ تنفيذ التحويل الفعلي بعد التأكيد
 async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
+    # إضافة سجل للتحقق من استدعاء الدالة وحالة user_data
     logger.info(f"confirm_transfer: المستخدم {user_id} ضغط زر التأكيد: '{query.data}'. user_data: {context.user_data}")
 
     if context.user_data.get("transfer_stage") != "confirm_transfer":
@@ -233,6 +237,7 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.warning(f"المستخدم {user_id} حاول تأكيد تحويل في مرحلة غير صحيحة.")
         context.user_data.pop("transfer_stage", None)
         context.user_data.pop("transfer_details", None)
+        context.user_data.pop("awaiting_input", None) # ✅ مسح حالة awaiting_input
         return
 
     if query.data == "confirm_transfer_yes":
@@ -246,6 +251,7 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             logger.error(f"المستخدم {user_id} حاول تأكيد تحويل بدون تفاصيل. محتمل خطأ منطقي.")
             context.user_data.pop("transfer_stage", None)
+            context.user_data.pop("awaiting_input", None) # ✅ مسح حالة awaiting_input
             return
 
         target_id = details["target_id"]
@@ -263,6 +269,7 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.warning(f"المستخدم {user_id} أكد التحويل لكن رصيده أصبح غير كافٍ. الحالي: {current_balance}.")
             context.user_data.pop("transfer_stage", None)
             context.user_data.pop("transfer_details", None)
+            context.user_data.pop("awaiting_input", None) # ✅ مسح حالة awaiting_input
             return
 
         try:
@@ -298,6 +305,7 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data.pop("transfer_stage", None)
     context.user_data.pop("transfer_details", None)
+    context.user_data.pop("awaiting_input", None) # ✅ مسح حالة awaiting_input
 
 
 # ✅ عرض سجل التحويلات (للمشرفين فقط)
@@ -385,4 +393,4 @@ async def clear_all_transfers(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.info(f"المشرف {user_id} قام بحذف جميع سجلات التحويلات.")
     except Exception as e:
         logger.error(f"المشرف {user_id} فشل في حذف سجل التحويلات: {e}", exc_info=True)
-        await update.callback_query.message.reply_text("❌ حدث خطأ أثناء الحذف. يرجى مراجعة سجلات البوت.")
+        await update.callback_query.message.edit_text("❌ حدث خطأ أثناء الحذف. يرجى مراجعة سجلات البوت.")
