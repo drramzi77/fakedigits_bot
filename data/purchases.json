@@ -1,0 +1,56 @@
+{
+  "780028688": [
+    {
+      "platform": "WhatsApp",
+      "country": "sa",
+      "server_name": "⚡ سيرفر سريع",
+      "server_id": 1,
+      "price": 5,
+      "fake_number": "966544210391",
+      "status": "awaiting_code",
+      "date": "2025-06-08 05:33:15"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "sa",
+      "server_name": "⚡ سيرفر سريع",
+      "server_id": 1,
+      "price": 5,
+      "fake_number": "966546598750",
+      "status": "awaiting_code",
+      "date": "2025-06-08 05:33:45"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "sa",
+      "server_name": "⚡ سيرفر سريع",
+      "server_id": 1,
+      "price": 5,
+      "fake_number": "966511855247",
+      "status": "active",
+      "date": "2025-06-08 05:37:39",
+      "fake_code": "596993"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "ng",
+      "server_name": "⚡ سيرفر سريع",
+      "server_id": 1,
+      "price": 3,
+      "fake_number": "966596696586",
+      "status": "cancelled",
+      "date": "2025-06-08 05:38:00"
+    },
+    {
+      "platform": "Telegram",
+      "country": "eg",
+      "server_name": "⚡ تيلي سيرفر سريع",
+      "server_id": 1,
+      "price": 3,
+      "fake_number": "966527520462",
+      "status": "active",
+      "date": "2025-06-08 05:38:15",
+      "fake_code": "384127"
+    }
+  ]
+}

@@ -11,7 +11,9 @@ from handlers.category_handler import (
     handle_platform_buttons,
     handle_country_selection,
     handle_fake_purchase,
-    show_ready_numbers
+    show_ready_numbers,
+    get_fake_code, # # إضافة الدالة الجديدة
+    cancel_fake_number # # إضافة الدالة الجديدة
 )
 from handlers.transfer_handler import (
     start_transfer,
@@ -162,6 +164,10 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_withdraw_request, pattern="^withdraw_request$"))
     app.add_handler(CallbackQueryHandler(handle_favorites, pattern="^favorites$"))
     app.add_handler(CallbackQueryHandler(add_to_favorites, pattern="^fav_"))
+
+    # # المعالجات الجديدة لطلب الكود وإلغاء الرقم
+    app.add_handler(CallbackQueryHandler(get_fake_code, pattern="^get_code_"))
+    app.add_handler(CallbackQueryHandler(cancel_fake_number, pattern="^cancel_number_"))
 
     # ربح رصيد مجانًا
     app.add_handler(CallbackQueryHandler(show_earn_credit_page, pattern="^earn_credit$"))
