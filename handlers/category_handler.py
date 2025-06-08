@@ -2,16 +2,18 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from keyboards.server_kb import load_servers, server_keyboard, load_all_servers_data, save_servers_data
 from utils.balance import get_user_balance, update_balance
-from handlers.favorites_handler import add_to_favorites
 import json
 import os
 import random
 import logging
 from datetime import datetime
 from keyboards.category_kb import category_inline_keyboard
+from utils.data_manager import load_json_file, save_json_file
+from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
 
 logger = logging.getLogger(__name__)
-PURCHASES_FILE = "data/purchases.json"
+PURCHASES_FILE = os.path.join("data", "purchases.json")
+SERVERS_FILE = os.path.join("data", "servers.json")
 
 PLATFORMS = ["WhatsApp", "Telegram", "Snapchat", "Instagram", "Facebook", "TikTok"]
 
@@ -50,8 +52,8 @@ async def handle_country_selection(update: Update, context: ContextTypes.DEFAULT
     _, country_code, platform = query.data.split("_")
     user_id = update.effective_user.id
     balance = get_user_balance(user_id)
-    
-    all_servers_data = load_all_servers_data()
+
+    all_servers_data = load_json_file(SERVERS_FILE, [])
     country_entry = next((entry for entry in all_servers_data if entry["platform"] == platform and entry["country"] == country_code), None)
 
     available_servers_for_display = []
@@ -78,13 +80,13 @@ async def handle_country_selection(update: Update, context: ContextTypes.DEFAULT
         )])
 
     buttons.append([InlineKeyboardButton("⭐️ أضف إلى المفضلة", callback_data=f"fav_{platform}_{country_code}")])
-    buttons.append([InlineKeyboardButton("🔙 العودة", callback_data=f"select_app_{platform}")])
+    buttons.append(back_button(callback_data=f"select_app_{platform}", text="🔙 العودة"))
 
     await query.message.edit_text(
         f"✅ رصيدك الحالي: {balance} ر.س\n"
         f"عدد السيرفرات المتوفرة: {len(available_servers_for_display)}\n\n"
         "اختر السيرفر الذي ترغب بتجربته:",
-        reply_markup=InlineKeyboardMarkup(buttons),
+        reply_markup=create_reply_markup(buttons),
         parse_mode="HTML"
     )
     logger.info(f"المستخدم {user_id} يعرض سيرفرات {country_code} لـ {platform}. رصيده: {balance}.")
@@ -94,7 +96,7 @@ async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
-    
+
     try:
         _, platform, country_code, server_id_str = query.data.split("_")
         server_id = int(server_id_str)
@@ -103,7 +105,7 @@ async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.message.edit_text("❌ حدث خطأ في معالجة طلبك. يرجى المحاولة مرة أخرى.")
         return
 
-    all_servers_data = load_all_servers_data()
+    all_servers_data = load_json_file(SERVERS_FILE, [])
     selected_server_entry = None
     for entry in all_servers_data:
         if entry["platform"] == platform and entry["country"] == country_code:
@@ -127,8 +129,8 @@ async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.message.edit_text(
             f"❌ عذراً، لا يوجد أرقام متاحة حالياً في سيرفر <b>{selected['name']}</b> لـ <b>{platform}</b> في <b>{country_code.upper()}</b>.",
             parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 العودة لاختيار الدولة", callback_data=f"country_{country_code}_{platform}")]
+            reply_markup=create_reply_markup([
+                back_button(callback_data=f"country_{country_code}_{platform}", text="🔙 العودة لاختيار الدولة")
             ])
         )
         logger.info(f"المستخدم {user_id} حاول شراء سيرفر بكمية 0: {platform}-{country_code}-{server_id}.")
@@ -137,9 +139,9 @@ async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYP
     if user_balance < price:
         await query.message.edit_text(
             f"❌ رصيدك الحالي ({user_balance} ر.س) غير كافٍ لشراء هذا الرقم الذي يكلف {price} ر.س. يرجى شحن رصيدك.",
-            reply_markup=InlineKeyboardMarkup([
+            reply_markup=create_reply_markup([
                 [InlineKeyboardButton("💳 شحن رصيدي", callback_data="recharge")],
-                [InlineKeyboardButton("🔙 العودة", callback_data=f"country_{country_code}_{platform}")]
+                back_button(callback_data=f"country_{country_code}_{platform}", text="🔙 العودة")
             ]),
             parse_mode="HTML"
         )
@@ -147,22 +149,15 @@ async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     selected["quantity"] -= 1
-    save_servers_data(all_servers_data)
+    save_json_file(SERVERS_FILE, all_servers_data)
 
     update_balance(user_id, -price)
 
-    purchases = {}
-    if os.path.exists(PURCHASES_FILE):
-        try:
-            with open(PURCHASES_FILE, "r", encoding="utf-8") as f:
-                purchases = json.load(f)
-        except json.JSONDecodeError:
-            logger.error(f"ملف المشتريات '{PURCHASES_FILE}' تالف. سيتم إعادة إنشائه للمستخدم {user_id}.", exc_info=True)
-            purchases = {}
-    
+    purchases = load_json_file(PURCHASES_FILE, {})
+
     user_purchases = purchases.get(str(user_id), [])
     fake_number = f"9665{random.randint(10000000, 99999999)}"
-    
+
     purchase_record = {
         "platform": platform,
         "country": country_code,
@@ -176,18 +171,12 @@ async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYP
     user_purchases.append(purchase_record)
     purchases[str(user_id)] = user_purchases
 
-    try:
-        with open(PURCHASES_FILE, "w", encoding="utf-8") as f:
-            json.dump(purchases, f, indent=2, ensure_ascii=False)
-    except IOError as e:
-        logger.error(f"خطأ في حفظ ملف المشتريات '{PURCHASES_FILE}' للمستخدم {user_id}: {e}", exc_info=True)
-        await query.message.reply_text("❌ حدث خطأ أثناء حفظ سجل المشتريات. يرجى التواصل مع الدعم.")
-        return
+    save_json_file(PURCHASES_FILE, purchases)
 
-    buttons = InlineKeyboardMarkup([
+    buttons = create_reply_markup([
         [InlineKeyboardButton("💬 طلب الكود", callback_data=f"get_code_{fake_number}_{server_id}")],
         [InlineKeyboardButton("❌ إلغاء الرقم", callback_data=f"cancel_number_{fake_number}_{server_id}")],
-        [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+        back_button()
     ])
 
     await query.message.edit_text(
@@ -213,10 +202,10 @@ async def handle_random_country(update: Update, context: ContextTypes.DEFAULT_TY
     user_id = query.from_user.id
     balance = get_user_balance(user_id)
 
-    all_data = load_all_servers_data()
+    all_data = load_json_file(SERVERS_FILE, [])
     candidates = [
-        s for s in all_data 
-        if s["platform"] == platform and 
+        s for s in all_data
+        if s["platform"] == platform and
            any(server.get("quantity", 0) > 0 for server in s.get("servers", []))
     ]
     if not candidates:
@@ -245,13 +234,13 @@ async def handle_random_country(update: Update, context: ContextTypes.DEFAULT_TY
             f"{s['name']} - 💰 {s['price']} ر.س ({s.get('quantity', 0)} متاح)",
             callback_data=f"buy_{platform}_{country_code}_{s['id']}"
         )])
-    buttons.append([InlineKeyboardButton("🔙 العودة", callback_data=f"select_app_{platform}")])
+    buttons.append(back_button(callback_data=f"select_app_{platform}", text="🔙 العودة"))
 
     await query.message.edit_text(
         f"🎲 تم اختيار دولة عشوائية: {country_code.upper()}\n"
         f"✅ رصيدك الحالي: {balance} ر.س\n"
         "اختر السيرفر المناسب:",
-        reply_markup=InlineKeyboardMarkup(buttons),
+        reply_markup=create_reply_markup(buttons),
         parse_mode="HTML"
     )
     logger.info(f"المستخدم {user_id} يعرض سيرفرات الدولة العشوائية {country_code} لـ {platform}.")
@@ -262,7 +251,7 @@ async def handle_most_available_countries(update: Update, context: ContextTypes.
     await query.answer()
     platform = query.data.replace("most_", "")
 
-    all_data = load_all_servers_data()
+    all_data = load_json_file(SERVERS_FILE, [])
 
     countries_with_availability = set()
     for entry in all_data:
@@ -278,12 +267,12 @@ async def handle_most_available_countries(update: Update, context: ContextTypes.
     buttons = []
     for code in sorted(list(countries_with_availability)):
         buttons.append([InlineKeyboardButton(f"{get_flag(code)} {code.upper()}", callback_data=f"country_{code}_{platform}")])
-    
-    buttons.append([InlineKeyboardButton("🔙 العودة", callback_data=f"select_app_{platform}")])
+
+    buttons.append(back_button(callback_data=f"select_app_{platform}", text="🔙 العودة"))
 
     await query.message.edit_text(
         f"📦 الدول المتوفرة حالياً لـ {platform}:",
-        reply_markup=InlineKeyboardMarkup(buttons),
+        reply_markup=create_reply_markup(buttons),
         parse_mode="HTML"
     )
     logger.info(f"تم عرض الدول الأكثر توفراً لـ {platform}.")
@@ -322,7 +311,7 @@ async def show_available_platforms(update: Update, context: ContextTypes.DEFAULT
     query = update.callback_query
     await query.answer()
 
-    all_data = load_all_servers_data()
+    all_data = load_json_file(SERVERS_FILE, [])
 
     platforms_with_availability = {}
     for entry in all_data:
@@ -348,11 +337,11 @@ async def show_available_platforms(update: Update, context: ContextTypes.DEFAULT
             InlineKeyboardButton(flag_line, callback_data=f"select_app_{platform}")
         ])
 
-    buttons.append([InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard")])
+    buttons.append(back_button())
 
     await query.message.edit_text(
         "📲 <b>المنصات المتاحة الآن:</b>\nاختر المنصة لرؤية الأرقام المتوفرة:",
-        reply_markup=InlineKeyboardMarkup(buttons),
+        reply_markup=create_reply_markup(buttons),
         parse_mode="HTML"
     )
     logger.info("تم عرض المنصات المتاحة حاليا.")
@@ -364,7 +353,7 @@ async def show_ready_numbers(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = query.from_user.id
     balance = get_user_balance(user_id)
 
-    all_data = load_all_servers_data()
+    all_data = load_json_file(SERVERS_FILE, [])
 
     ready_numbers = []
     for item in all_data:
@@ -394,11 +383,11 @@ async def show_ready_numbers(update: Update, context: ContextTypes.DEFAULT_TYPE)
         callback = f"buy_{item['platform']}_{item['country']}_{item['server']['id']}"
         buttons.append([InlineKeyboardButton(btn_text, callback_data=callback)])
 
-    buttons.append([InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard")])
+    buttons.append(back_button())
 
     await query.message.edit_text(
         "⚡ <b>أرقام فورية جاهزة:</b>\nاختر رقمًا للشراء الفوري:",
-        reply_markup=InlineKeyboardMarkup(buttons),
+        reply_markup=create_reply_markup(buttons),
         parse_mode="HTML"
     )
     logger.info(f"تم عرض {len(ready_numbers[:10])} أرقام فورية جاهزة للمستخدم {user_id}.")
@@ -408,23 +397,16 @@ async def get_fake_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
-    
+
     try:
-        _, _, fake_number, server_id_str = query.data.split("_") # # تم التعديل هنا
+        _, _, fake_number, server_id_str = query.data.split("_")
         server_id = int(server_id_str)
     except ValueError:
         logger.error(f"خطأ في تحليل بيانات الكولباك لطلب الكود الوهمي: {query.data}", exc_info=True)
         await query.message.edit_text("❌ حدث خطأ في معالجة طلبك.")
         return
 
-    purchases = {}
-    if os.path.exists(PURCHASES_FILE):
-        try:
-            with open(PURCHASES_FILE, "r", encoding="utf-8") as f:
-                purchases = json.load(f)
-        except json.JSONDecodeError:
-            logger.error(f"ملف المشتريات '{PURCHASES_FILE}' تالف عند طلب الكود.", exc_info=True)
-            return
+    purchases = load_json_file(PURCHASES_FILE, {})
 
     user_purchases = purchases.get(str(user_id), [])
     target_purchase = None
@@ -438,12 +420,12 @@ async def get_fake_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.edit_text("❌ لم يتم العثور على هذا الرقم في سجل مشترياتك.")
         logger.warning(f"المستخدم {user_id} حاول طلب كود لرقم غير موجود في سجل مشترياته: {fake_number}.")
         return
-    
+
     if target_purchase.get("status") == "active":
         await query.edit_message_text(f"✅ الكود لهذا الرقم ({fake_number}) تم إرساله مسبقاً. الكود الوهمي: <code>{target_purchase.get('fake_code', 'غير متوفر')}</code>", parse_mode="HTML")
         logger.info(f"المستخدم {user_id} طلب كودًا لرقم {fake_number} وهو نشط بالفعل.")
         return
-    
+
     if target_purchase.get("status") == "cancelled":
         await query.edit_message_text(f"❌ هذا الرقم ({fake_number}) تم إلغاؤه مسبقاً. لا يمكن طلب الكود.")
         logger.warning(f"المستخدم {user_id} حاول طلب كود لرقم {fake_number} تم إلغاؤه.")
@@ -452,25 +434,19 @@ async def get_fake_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     fake_code = str(random.randint(100000, 999999))
     target_purchase["status"] = "active"
     target_purchase["fake_code"] = fake_code
-    
+
     purchases[str(user_id)] = user_purchases
 
-    try:
-        with open(PURCHASES_FILE, "w", encoding="utf-8") as f:
-            json.dump(purchases, f, indent=2, ensure_ascii=False)
-    except IOError as e:
-        logger.error(f"خطأ في حفظ ملف المشتريات '{PURCHASES_FILE}' بعد إرسال الكود: {e}", exc_info=True)
-        await query.message.reply_text("❌ حدث خطأ أثناء تحديث سجل المشتريات. يرجى التواصل مع الدعم.")
-        return
-    
+    save_json_file(PURCHASES_FILE, purchases)
+
     await query.message.edit_text(
         f"✅ تم إرسال الكود بنجاح!\n\n"
         f"🔢 الرقم: <code>{fake_number}</code>\n"
         f"🔑 الكود الخاص بك: <code>{fake_code}</code>\n\n"
         f"⏳ <i>ملاحظة: هذا كود وهمي لأغراض الاختبار.</i>",
         parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+        reply_markup=create_reply_markup([
+            back_button()
         ])
     )
     logger.info(f"المستخدم {user_id} طلب كودًا وهميًا لرقم {fake_number}. الكود: {fake_code}.")
@@ -483,21 +459,14 @@ async def cancel_fake_number(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = update.effective_user.id
 
     try:
-        _, _, fake_number, server_id_str = query.data.split("_") # # تم التعديل هنا
+        _, _, fake_number, server_id_str = query.data.split("_")
         server_id = int(server_id_str)
     except ValueError:
         logger.error(f"خطأ في تحليل بيانات الكولباك لإلغاء الرقم الوهمي: {query.data}", exc_info=True)
         await query.message.edit_text("❌ حدث خطأ في معالجة طلبك. يرجى المحاولة مرة أخرى.")
         return
 
-    purchases = {}
-    if os.path.exists(PURCHASES_FILE):
-        try:
-            with open(PURCHASES_FILE, "r", encoding="utf-8") as f:
-                purchases = json.load(f)
-        except json.JSONDecodeError:
-            logger.error(f"ملف المشتريات '{PURCHASES_FILE}' تالف عند إلغاء الرقم.", exc_info=True)
-            return
+    purchases = load_json_file(PURCHASES_FILE, {})
 
     user_purchases = purchases.get(str(user_id), [])
     target_purchase_index = -1
@@ -518,7 +487,7 @@ async def cancel_fake_number(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.edit_message_text("❌ لا يمكن إلغاء الرقم بعد الحصول على الكود.")
         logger.warning(f"المستخدم {user_id} حاول إلغاء رقم {fake_number} بعد حصوله على الكود.")
         return
-    
+
     if target_purchase.get("status") == "cancelled":
         await query.edit_message_text(f"❌ هذا الرقم ({fake_number}) تم إلغاؤه مسبقاً.")
         logger.warning(f"المستخدم {user_id} حاول إلغاء رقم {fake_number} تم إلغاؤه مسبقاً.")
@@ -530,15 +499,9 @@ async def cancel_fake_number(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_purchases[target_purchase_index]["status"] = "cancelled"
     purchases[str(user_id)] = user_purchases
 
-    try:
-        with open(PURCHASES_FILE, "w", encoding="utf-8") as f:
-            json.dump(purchases, f, indent=2, ensure_ascii=False)
-    except IOError as e:
-        logger.error(f"خطأ في حفظ ملف المشتريات '{PURCHASES_FILE}' بعد إلغاء الرقم: {e}", exc_info=True)
-        await query.message.reply_text("❌ حدث خطأ أثناء تحديث سجل المشتريات. يرجى التواصل مع الدعم.")
-        return
-    
-    all_servers_data = load_all_servers_data()
+    save_json_file(PURCHASES_FILE, purchases)
+
+    all_servers_data = load_json_file(SERVERS_FILE, [])
     for entry in all_servers_data:
         if entry["platform"] == target_purchase["platform"] and entry["country"] == target_purchase["country"]:
             for s in entry.get("servers", []):
@@ -546,15 +509,15 @@ async def cancel_fake_number(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     s["quantity"] = s.get("quantity", 0) + 1
                     break
             break
-    save_servers_data(all_servers_data)
+    save_json_file(SERVERS_FILE, all_servers_data)
 
     await query.message.edit_text(
         f"✅ تم إلغاء الرقم <code>{fake_number}</code> بنجاح.\n"
         f"💰 تم استرداد <b>{price} ر.س</b> إلى رصيدك.\n"
         f"💡 رصيدك الجديد: {get_user_balance(user_id)} ر.س",
         parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+        reply_markup=create_reply_markup([
+            back_button()
         ])
     )
     logger.info(f"المستخدم {user_id} ألغى الرقم {fake_number} (سيرفر {server_id}). تم استرداد {price} ر.س. الكمية الجديدة للسيرفر: {s.get('quantity', 0)}.")

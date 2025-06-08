@@ -6,45 +6,25 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.balance import get_user_balance, set_user_balance
 from handlers.main_dashboard import show_dashboard
-import config # ✅ هذا الاستيراد صحيح ويتم استخدامه كـ config.ADMINS
+from utils.data_manager import load_json_file, save_json_file
+from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
 
 logger = logging.getLogger(__name__)
 
 # 📁 مسار ملف المستخدمين
-USER_FILE = "data/users.json"
+USER_FILE = os.path.join("data", "users.json")
 
 # ✅ تحميل بيانات المستخدمين من الملف
 def load_users():
-    try:
-        if not os.path.exists(USER_FILE):
-            logger.warning(f"ملف المستخدمين '{USER_FILE}' غير موجود. سيتم إنشاء ملف فارغ.")
-            return {}
-        with open(USER_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        logger.error(f"خطأ في قراءة ملف JSON للمستخدمين '{USER_FILE}'. الملف قد يكون تالفًا.", exc_info=True)
-        return {}
-    except IOError as e:
-        logger.error(f"خطأ في الوصول إلى ملف المستخدمين '{USER_FILE}' أثناء التحميل: {e}", exc_info=True)
-        return {}
-    except Exception as e:
-        logger.error(f"خطأ غير متوقع عند تحميل المستخدمين: {e}", exc_info=True)
-        return {}
+    return load_json_file(USER_FILE, {})
 
 # ✅ حفظ بيانات المستخدمين بعد التعديل
 def save_users(users):
-    try:
-        with open(USER_FILE, "w", encoding="utf-8") as f:
-            json.dump(users, f, ensure_ascii=False, indent=2)
-        logger.info(f"تم حفظ بيانات المستخدمين في '{USER_FILE}'.")
-    except IOError as e:
-        logger.error(f"خطأ في الوصول إلى ملف المستخدمين '{USER_FILE}' أثناء الحفظ: {e}", exc_info=True)
-    except Exception as e:
-        logger.error(f"خطأ غير متوقع عند حفظ المستخدمين: {e}", exc_info=True)
+    save_json_file(USER_FILE, users)
 
 # ✅ دالة جديدة: ضمان وجود المستخدم في قاعدة البيانات (users.json)
 def ensure_user_exists(user_id: int, user_info: dict):
-    users = load_users()
+    users = load_json_file(USER_FILE, {})
     user_id_str = str(user_id)
 
     if user_id_str not in users:
@@ -59,7 +39,7 @@ def ensure_user_exists(user_id: int, user_info: dict):
             "balance": 0.0,
             "banned": False
         }
-        save_users(users)
+        save_json_file(USER_FILE, users)
         logger.info(f"تم تسجيل مستخدم جديد: {user_id_str} ({user_info.get('username')}).")
     else:
         # المستخدم موجود، يمكن تحديث بعض معلوماته إذا لزم الأمر
@@ -77,7 +57,7 @@ def ensure_user_exists(user_id: int, user_info: dict):
             updated = True
 
         if updated:
-            save_users(users)
+            save_json_file(USER_FILE, users)
             logger.info(f"تم تحديث معلومات المستخدم {user_id_str}.")
 
 
@@ -88,7 +68,7 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.answer()
         context.user_data["awaiting_input"] = "admin_user_search"
 
-    users = load_users()
+    users = load_json_file(USER_FILE, {})
     search_term = context.user_data.get("admin_search", "").lower()
     results = []
 
@@ -107,8 +87,8 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if not results:
         message_text = "❌ لا يوجد مستخدمون مطابقون."
-        reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard_clear_admin_search")]
+        reply_markup = create_reply_markup([
+            back_button(callback_data="back_to_dashboard_clear_admin_search")
         ])
         if query:
             await query.edit_message_text(message_text, reply_markup=reply_markup)
@@ -131,20 +111,20 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ]
         buttons.append(row)
 
-    buttons.append([InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard_clear_admin_search")])
+    buttons.append(back_button(callback_data="back_to_dashboard_clear_admin_search", text="🔙 العودة"))
 
     if query:
-        await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
+        await query.edit_message_text(text, parse_mode="HTML", reply_markup=create_reply_markup(buttons))
     else:
-        await update.message.reply_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=create_reply_markup(buttons))
     logger.info(f"تم عرض قائمة المستخدمين الإدارية لـ '{search_term}'.")
 
 
 # ✅ دعم البحث داخل الإدارة باسم المستخدم أو الـ ID
 async def handle_admin_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    # هنا تم الاستيراد الصحيح لـ ADMINS من config
-    if user_id not in config.ADMINS: # ✅ هذا الاستخدام صحيح
+    import config
+    if user_id not in config.ADMINS:
         await update.message.reply_text("❌ ليس لديك صلاحية للبحث في قائمة المستخدمين.")
         logger.warning(f"المستخدم {user_id} حاول البحث في قائمة المستخدمين بدون صلاحية.")
         context.user_data.pop("awaiting_input", None)
@@ -198,11 +178,11 @@ async def receive_balance_input(update: Update, context: ContextTypes.DEFAULT_TY
 
     user_id_to_edit = context.user_data.get("editing_user_id")
 
-    users = load_users()
+    users = load_json_file(USER_FILE, {})
 
     if user_id_to_edit in users:
         users[user_id_to_edit]["balance"] = round(new_balance, 2)
-        save_users(users)
+        save_json_file(USER_FILE, users)
         await update.message.reply_text(f"✅ تم تعديل رصيد المستخدم {user_id_to_edit} إلى {new_balance} ر.س.")
         logger.info(f"المشرف {user_id} عدّل رصيد المستخدم {user_id_to_edit} إلى {new_balance}.")
     else:
@@ -219,13 +199,13 @@ async def handle_block_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     user_id_to_toggle = query.data.split("_")[1]
-    users = load_users()
+    users = load_json_file(USER_FILE, {})
     admin_id = update.effective_user.id
 
     if user_id_to_toggle in users:
         current_status = users[user_id_to_toggle].get("banned", False)
         users[user_id_to_toggle]["banned"] = not current_status
-        save_users(users)
+        save_json_file(USER_FILE, users)
         new_status_text = "حظر" if not current_status else "فك الحظر"
         await query.edit_message_text(f"✅ تم تحديث حالة المستخدم {user_id_to_toggle} إلى: {new_status_text}.")
         logger.info(f"المشرف {admin_id} قام بـ {new_status_text} المستخدم {user_id_to_toggle}.")
@@ -242,7 +222,7 @@ async def confirm_delete_user(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_id_to_delete = query.data.split("_")[2]
     admin_id = update.effective_user.id
 
-    keyboard = InlineKeyboardMarkup([
+    keyboard = create_reply_markup([
         [
             InlineKeyboardButton("✅ نعم، احذف", callback_data=f"delete_user_confirmed_{user_id_to_delete}"),
             InlineKeyboardButton("❌ إلغاء", callback_data="admin_users")
@@ -263,12 +243,12 @@ async def handle_delete_user(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
 
     user_id_to_delete = query.data.split("_")[3]
-    users = load_users()
+    users = load_json_file(USER_FILE, {})
     admin_id = update.effective_user.id
 
     if user_id_to_delete in users:
         del users[user_id_to_delete]
-        save_users(users)
+        save_json_file(USER_FILE, users)
         await query.edit_message_text(f"🗑️ تم حذف المستخدم <code>{user_id_to_delete}</code> بنجاح.")
         logger.info(f"المشرف {admin_id} قام بحذف المستخدم {user_id_to_delete} بعد التأكيد.")
     else:

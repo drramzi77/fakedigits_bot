@@ -1,4 +1,5 @@
 import json
+import os
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -6,10 +7,12 @@ from config import ADMINS # ✅ تم إضافة هذا السطر
 
 logger = logging.getLogger(__name__)
 
+
 # ✅ قراءة الرصيد من ملف users.json
 def get_user_balance(user_id: int) -> float:
     try:
-        with open("data/users.json", "r", encoding="utf-8") as f:
+        # استخدم os.path.join هنا مباشرة
+        with open(os.path.join("data", "users.json"), "r", encoding="utf-8") as f: # ✅ تم التعديل
             users = json.load(f)
         return users.get(str(user_id), {}).get("balance", 0)
     except FileNotFoundError:

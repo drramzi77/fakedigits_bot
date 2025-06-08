@@ -1,6 +1,7 @@
 # keyboards/countries_kb.py
 
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
 
 # ✅ قائمة الدول حسب المناطق
 ARAB_COUNTRIES = [
@@ -78,5 +79,5 @@ def countries_keyboard(region: str, platform: str):
         for name, code in countries
     ]
 
-    buttons.append([InlineKeyboardButton("🔙 العودة", callback_data=f"select_app_{platform}")])
-    return InlineKeyboardMarkup(buttons)
+    buttons.append(back_button(callback_data=f"select_app_{platform}", text="🔙 العودة"))
+    return create_reply_markup(buttons)

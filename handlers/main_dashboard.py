@@ -1,19 +1,20 @@
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 from keyboards.dashboard_kb import dashboard_keyboard
-from utils.check_balance import get_user_balance  # ✅ لاستدعاء الرصيد من JSON
+from utils.check_balance import get_user_balance
+from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
 
 # ✅ عرض القائمة الرئيسية
 async def show_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
-    balance = get_user_balance(user_id) #
+    balance = get_user_balance(user_id)
 
     # الاسم الظاهر (username أو الاسم الكامل)
     display_name = user.username if user.username else f"{user.first_name} {user.last_name or ''}"
 
     message = (
-        f"👋 أهلاً بك يا <b>{display_name}</b> في لوحة تحكمك الرئيسية! 😊\n\n" # التعديل هنا
+        f"👋 أهلاً بك يا <b>{display_name}</b> في لوحة تحكمك الرئيسية! 😊\n\n"
         f"🆔 <b>ID:</b> <code>{user_id}</code>\n"
         f"💰 <b>الرصيد:</b> {balance} ر.س\n\n"
         f"📢 اشترك في @FakeDigitsPlus\n"
@@ -22,21 +23,21 @@ async def show_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if update.callback_query:
         await update.callback_query.message.edit_text(
-            message, reply_markup=dashboard_keyboard(user_id), parse_mode="HTML" #
+            message, reply_markup=dashboard_keyboard(user_id), parse_mode="HTML"
         )
     elif update.message:
         await update.message.reply_text(
-            message, reply_markup=dashboard_keyboard(user_id), parse_mode="HTML" #
+            message, reply_markup=dashboard_keyboard(user_id), parse_mode="HTML"
         )
 
 
 # ✅ قائمة الأزرار السفلية الخاصة بالشحن
 def recharge_options_keyboard():
-    return InlineKeyboardMarkup([
+    return create_reply_markup([
         [
             InlineKeyboardButton("🧑‍💼 شحن من الإدارة", callback_data="recharge_admin")
         ],
-        [InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard")]
+        back_button()
     ])
 
 
@@ -85,8 +86,8 @@ async def handle_recharge_admin(update: Update, context: ContextTypes.DEFAULT_TY
         "🔗 <a href='https://t.me/DrRamzi0'>@DrRamzi0</a>\n\n"
         "📤 أرسل له إثبات الدفع + معرفك في البوت، وسيتم شحن الرصيد يدويًا خلال دقائق.\n\n"
         "🔙 يمكنك العودة باستخدام الزر أدناه.",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 العودة", callback_data="recharge")]
+        reply_markup=create_reply_markup([
+            back_button(callback_data="recharge", text="🔙 العودة")
         ]),
         parse_mode="HTML"
     )

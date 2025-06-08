@@ -51,6 +51,27 @@
       "status": "active",
       "date": "2025-06-08 05:38:15",
       "fake_code": "384127"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "ng",
+      "server_name": "⚡ سيرفر سريع",
+      "server_id": 1,
+      "price": 3,
+      "fake_number": "966599524058",
+      "status": "awaiting_code",
+      "date": "2025-06-09 00:11:08"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "us",
+      "server_name": "🎯 سيرفر موثوق",
+      "server_id": 2,
+      "price": 6,
+      "fake_number": "966520156331",
+      "status": "active",
+      "date": "2025-06-09 00:18:16",
+      "fake_code": "489864"
     }
   ]
 }

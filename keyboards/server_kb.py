@@ -3,40 +3,21 @@
 import json
 import logging
 import os
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton # # أضف هذا السطر
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from utils.data_manager import load_json_file, save_json_file
+from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
 
 logger = logging.getLogger(__name__)
 
-SERVERS_FILE = "data/servers.json"
+SERVERS_FILE = os.path.join("data", "servers.json")
 
 # ✅ تحميل بيانات السيرفرات كاملة من ملف JSON
 def load_all_servers_data() -> list:
-    try:
-        if not os.path.exists(SERVERS_FILE):
-            logger.warning(f"ملف السيرفرات '{SERVERS_FILE}' غير موجود. سيتم إنشاء قائمة فارغة.")
-            return []
-        with open(SERVERS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        logger.error(f"خطأ في قراءة ملف JSON للسيرفرات '{SERVERS_FILE}'. الملف قد يكون تالفًا.", exc_info=True)
-        return []
-    except IOError as e:
-        logger.error(f"خطأ في الوصول إلى ملف السيرفرات '{SERVERS_FILE}' أثناء التحميل: {e}", exc_info=True)
-        return []
-    except Exception as e:
-        logger.error(f"خطأ غير متوقع عند تحميل بيانات السيرفرات: {e}", exc_info=True)
-        return []
+    return load_json_file(SERVERS_FILE, [])
 
 # ✅ حفظ بيانات السيرفرات كاملة إلى ملف JSON
 def save_servers_data(data: list):
-    try:
-        with open(SERVERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        logger.info(f"تم حفظ بيانات السيرفرات في '{SERVERS_FILE}'.")
-    except IOError as e:
-        logger.error(f"خطأ في الوصول إلى ملف السيرفرات '{SERVERS_FILE}' أثناء الحفظ: {e}", exc_info=True)
-    except Exception as e:
-        logger.error(f"خطأ غير متوقع عند حفظ بيانات السيرفرات: {e}", exc_info=True)
+    save_json_file(SERVERS_FILE, data)
 
 # ✅ تحميل السيرفرات لمنصة ودولة معينة (مع تصفية الكمية)
 def load_servers(platform: str, country_code: str) -> list:
@@ -50,7 +31,7 @@ def load_servers(platform: str, country_code: str) -> list:
 
 # ✅ إنشاء لوحة السيرفرات بأيقونات مميزة
 def server_keyboard(platform: str, country_code: str) -> InlineKeyboardMarkup:
-    servers = load_servers(platform, country_code) # # هذه الدالة الآن ترجع فقط المتوفر
+    servers = load_servers(platform, country_code)
 
     buttons = []
     emoji_cycle = ["⚡", "🎯", "💎", "🚀", "🎲", "🧩"]
@@ -62,5 +43,5 @@ def server_keyboard(platform: str, country_code: str) -> InlineKeyboardMarkup:
         callback = f"buy_{platform}_{country_code}_{server['id']}"
         buttons.append([InlineKeyboardButton(label, callback_data=callback)])
 
-    buttons.append([InlineKeyboardButton("🔙 العودة", callback_data=f"select_app_{platform}")])
-    return InlineKeyboardMarkup(buttons)
+    buttons.append(back_button(callback_data=f"select_app_{platform}", text="🔙 العودة"))
+    return create_reply_markup(buttons)

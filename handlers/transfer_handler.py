@@ -1,3 +1,5 @@
+# handlers/transfer_handler.py
+
 import json
 import logging
 import os
@@ -5,17 +7,19 @@ from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.balance import get_user_balance, update_balance
-from config import ADMINS # ✅ تم إضافة هذا السطر
+from config import ADMINS
+from utils.data_manager import load_json_file, save_json_file
+from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
 
 logger = logging.getLogger(__name__)
 
-TRANSFER_LOG_FILE = "data/transfers.json"
+TRANSFER_LOG_FILE = os.path.join("data", "transfers.json")
 
 # 🔘 زر تواصل مع الإدارة
 def contact_admin_button():
-    return InlineKeyboardMarkup([
+    return create_reply_markup([
         [InlineKeyboardButton("💬 تواصل مع الدعم", url="https://t.me/DrRamzi0")],
-        [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+        back_button()
     ])
 
 # 📁 سجل التحويلات
@@ -28,35 +32,16 @@ def log_transfer(sender_id, target_id, amount, fee):
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
-    data = []
-    try:
-        if os.path.exists(TRANSFER_LOG_FILE):
-            with open(TRANSFER_LOG_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-    except json.JSONDecodeError:
-        logger.error(f"ملف سجل التحويلات '{TRANSFER_LOG_FILE}' تالف. سيتم إعادة إنشائه.", exc_info=True)
-        data = []
-    except FileNotFoundError:
-        logger.warning(f"ملف سجل التحويلات '{TRANSFER_LOG_FILE}' غير موجود. سيتم إنشاؤه.")
-    except Exception as e:
-        logger.error(f"خطأ غير متوقع عند تحميل سجل التحويلات: {e}", exc_info=True)
-
+    data = load_json_file(TRANSFER_LOG_FILE, [])
     data.append(transfer)
-    try:
-        with open(TRANSFER_LOG_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        logger.info(f"تم تسجيل تحويل: من {sender_id} إلى {target_id} بمبلغ {amount}.")
-    except IOError as e:
-        logger.error(f"خطأ في كتابة ملف سجل التحويلات '{TRANSFER_LOG_FILE}': {e}", exc_info=True)
-    except Exception as e:
-        logger.error(f"خطأ غير متوقع عند تسجيل التحويل: {e}", exc_info=True)
+    save_json_file(TRANSFER_LOG_FILE, data)
+    logger.info(f"تم تسجيل تحويل: من {sender_id} إلى {target_id} بمبلغ {amount}.")
 
 # ✅ عند الضغط على زر "تحويل الرصيد"
 async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     balance = get_user_balance(user_id)
 
-    # إضافة سجل للتحقق من استدعاء الدالة وحالة user_data
     logger.info(f"start_transfer: المستخدم {user_id} ضغط على تحويل الرصيد. user_data قبل التعديل: {context.user_data}")
 
     if update.callback_query:
@@ -65,14 +50,14 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         message_editor = update.message.reply_text
 
-    if user_id in ADMINS: # ✅ تم التعديل من ADMIN_IDS إلى ADMINS
+    if user_id in ADMINS:
         logger.warning(f"المشرف {user_id} حاول استخدام خيار تحويل الرصيد الخاص بالمستخدمين.")
         await message_editor(
             "⚠️ هذا الخيار مخصص فقط للمستخدمين.\n"
             "🔋 لشحن رصيد مستخدم، استخدم القسم المخصص لذلك في لوحة التحكم.",
             parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+            reply_markup=create_reply_markup([
+                back_button()
             ])
         )
         return
@@ -88,9 +73,8 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await message_editor(msg, parse_mode="HTML", reply_markup=contact_admin_button())
     else:
-        context.user_data["transfer_stage"] = "awaiting_input" # الحالة القديمة
-        context.user_data["awaiting_input"] = "transfer_amount" # ✅ الحالة الجديدة لموجه المدخلات
-        # إضافة سجل للتحقق من تعيين الحالة
+        context.user_data["transfer_stage"] = "awaiting_input"
+        context.user_data["awaiting_input"] = "transfer_amount"
         logger.info(f"start_transfer: تم تعيين transfer_stage لـ {user_id} إلى 'awaiting_input' و awaiting_input إلى 'transfer_amount'. user_data بعد التعديل: {context.user_data}")
         await message_editor(
             f"💰 رصيدك الحالي: <b>{balance} ر.س</b>\n\n"
@@ -101,7 +85,7 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "✅ <b>20</b>: المبلغ المطلوب تحويله\n"
             "💸 عمولة التحويل: <b>1%</b>",
             parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([
+            reply_markup=create_reply_markup([
                 [InlineKeyboardButton("❌ إلغاء", callback_data="back_to_dashboard")]
             ])
         )
@@ -111,7 +95,6 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ✅ معالجة مدخلات التحويل وطلب التأكيد
 async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    # إضافة سجل للتحقق من استدعاء الدالة وحالة user_data
     logger.info(f"handle_transfer_input: المستخدم {user_id} أرسل نص: '{update.message.text}'. user_data: {context.user_data}")
 
     text = update.message.text.strip()
@@ -121,8 +104,8 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text(
             "❌ الصيغة غير صحيحة. استخدم:\n<code>123456789 20</code>",
             parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+            reply_markup=create_reply_markup([
+                back_button()
             ])
         )
         context.user_data.pop("transfer_stage", None)
@@ -137,8 +120,8 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
         logger.warning(f"المستخدم {user_id} أدخل معرفًا أو مبلغًا غير رقمي للتحويل: '{text}'. الخطأ: {e}")
         await update.message.reply_text(
             "❌ تأكد من أن المعرف والمبلغ أرقام صحيحة.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+            reply_markup=create_reply_markup([
+                back_button()
             ])
         )
         context.user_data.pop("transfer_stage", None)
@@ -148,8 +131,8 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
     if target_id == user_id:
         await update.message.reply_text(
             "❌ لا يمكنك تحويل الرصيد إلى نفسك.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+            reply_markup=create_reply_markup([
+                back_button()
             ])
         )
         context.user_data.pop("transfer_stage", None)
@@ -160,8 +143,8 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
     if amount <= 0:
         await update.message.reply_text(
             "❌ المبلغ يجب أن يكون أكبر من صفر.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+            reply_markup=create_reply_markup([
+                back_button()
             ])
         )
         context.user_data.pop("transfer_stage", None)
@@ -191,7 +174,6 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
         "total_deduction": total_deduction
     }
     context.user_data["transfer_stage"] = "confirm_transfer"
-    # لا تمسح awaiting_input هنا، لأن المستخدم سيضغط على زر التأكيد/الإلغاء وليس نصًا آخر
 
     confirmation_message = (
         f"🔁 <b>تأكيد تحويل الرصيد</b>\n\n"
@@ -201,12 +183,12 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
         f"💰 إجمالي الخصم من رصيدك: <b>{total_deduction} ر.س</b>\n\n"
         "⚠️ يرجى التأكد من صحة المعرف. لا يمكن التراجع عن هذه العملية."
     )
-    confirmation_keyboard = InlineKeyboardMarkup([
+    confirmation_keyboard = create_reply_markup([
         [
             InlineKeyboardButton("✅ تأكيد التحويل", callback_data="confirm_transfer_yes"),
             InlineKeyboardButton("❌ إلغاء", callback_data="confirm_transfer_no")
         ],
-        [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+        back_button()
     ])
 
     await update.message.reply_text(
@@ -222,14 +204,13 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
-    # إضافة سجل للتحقق من استدعاء الدالة وحالة user_data
     logger.info(f"confirm_transfer: المستخدم {user_id} ضغط زر التأكيد: '{query.data}'. user_data: {context.user_data}")
 
     if context.user_data.get("transfer_stage") != "confirm_transfer":
         await query.edit_message_text(
             "❌ انتهت صلاحية عملية التحويل أو تم إلغاؤها.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+            reply_markup=create_reply_markup([
+                back_button()
             ])
         )
         logger.warning(f"المستخدم {user_id} حاول تأكيد تحويل في مرحلة غير صحيحة.")
@@ -243,8 +224,8 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not details:
             await query.edit_message_text(
                 "❌ بيانات التحويل غير موجودة. يرجى البدء من جديد.",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+                reply_markup=create_reply_markup([
+                    back_button()
                 ])
             )
             logger.error(f"المستخدم {user_id} حاول تأكيد تحويل بدون تفاصيل. محتمل خطأ منطقي.")
@@ -280,8 +261,8 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"💸 تم خصم عمولة <b>{fee} ر.س</b>.\n"
                 f"💰 رصيدك الجديد: <b>{get_user_balance(user_id)} ر.س</b>",
                 parse_mode="HTML",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+                reply_markup=create_reply_markup([
+                    back_button()
                 ])
             )
             logger.info(f"المستخدم {user_id} أكد وحوّل {amount} إلى {target_id}. الرصيد الجديد: {get_user_balance(user_id)}.")
@@ -295,8 +276,8 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "confirm_transfer_no":
         await query.edit_message_text(
             "❌ تم إلغاء عملية التحويل.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+            reply_markup=create_reply_markup([
+                back_button()
             ])
         )
         logger.info(f"المستخدم {user_id} ألغى عملية التحويل.")
@@ -310,22 +291,11 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def show_transfer_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
-    if user_id not in ADMINS: # ✅ تم التعديل من ADMIN_IDS إلى ADMINS
+    if user_id not in ADMINS:
         await update.callback_query.answer("❌ لا تملك صلاحية الوصول لهذا السجل.", show_alert=True)
         return
 
-    try:
-        with open(TRANSFER_LOG_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except FileNotFoundError:
-        logger.warning(f"ملف سجل التحويلات '{TRANSFER_LOG_FILE}' غير موجود عند محاولة عرضه.")
-        data = []
-    except json.JSONDecodeError:
-        logger.error(f"ملف سجل التحويلات '{TRANSFER_LOG_FILE}' تالف.", exc_info=True)
-        data = []
-    except Exception as e:
-        logger.error(f"خطأ غير متوقع عند محاولة عرض سجل التحويلات: {e}", exc_info=True)
-        data = []
+    data = load_json_file(TRANSFER_LOG_FILE, [])
 
     if not data:
         await update.callback_query.message.edit_text("📭 لا يوجد أي تحويلات حتى الآن.")
@@ -346,11 +316,9 @@ async def show_transfer_logs(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.callback_query.message.edit_text(
         message,
         parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard"),
-                InlineKeyboardButton("🗑️ حذف الكل", callback_data="confirm_clear_transfers")
-            ]
+        reply_markup=create_reply_markup([
+            back_button(text="🔙 العودة"),
+            [InlineKeyboardButton("🗑️ حذف الكل", callback_data="confirm_clear_transfers")]
         ])
     )
     logger.info(f"المشرف {user_id} عرض آخر {len(recent_transfers)} تحويلات.")
@@ -358,7 +326,7 @@ async def show_transfer_logs(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def confirm_clear_transfers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if user_id not in ADMINS: # ✅ تم التعديل من ADMIN_IDS إلى ADMINS
+    if user_id not in ADMINS:
         await update.callback_query.answer("❌ غير مصرح لك.", show_alert=True)
         logger.warning(f"المستخدم {user_id} حاول تأكيد حذف التحويلات بدون صلاحية.")
         return
@@ -366,10 +334,10 @@ async def confirm_clear_transfers(update: Update, context: ContextTypes.DEFAULT_
     await update.callback_query.message.edit_text(
         "⚠️ هل أنت متأكد من حذف جميع سجل التحويلات؟ لا يمكن التراجع.\n\n"
         "اضغط للتأكيد:",
-        reply_markup=InlineKeyboardMarkup([
+        reply_markup=create_reply_markup([
             [
                 InlineKeyboardButton("✅ نعم، احذف", callback_data="clear_transfers"),
-                InlineKeyboardButton("🔙 إلغاء", callback_data="back_to_dashboard")
+                InlineKeyboardButton("❌ إلغاء", callback_data="back_to_dashboard")
             ]
         ]),
         parse_mode="HTML"
@@ -379,16 +347,11 @@ async def confirm_clear_transfers(update: Update, context: ContextTypes.DEFAULT_
 
 async def clear_all_transfers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if user_id not in ADMINS: # ✅ تم التعديل من ADMIN_IDS إلى ADMINS
+    if user_id not in ADMINS:
         await update.callback_query.answer("❌ غير مصرح لك.", show_alert=True)
         logger.warning(f"المستخدم {user_id} حاول حذف جميع التحويلات بدون صلاحية.")
         return
 
-    try:
-        with open(TRANSFER_LOG_FILE, "w", encoding="utf-8") as f:
-            json.dump([], f)
-        await update.callback_query.message.edit_text("✅ تم حذف جميع سجل التحويلات.")
-        logger.info(f"المشرف {user_id} قام بحذف جميع سجلات التحويلات.")
-    except Exception as e:
-        logger.error(f"المشرف {user_id} فشل في حذف سجل التحويلات: {e}", exc_info=True)
-        await update.callback_query.message.edit_text("❌ حدث خطأ أثناء الحذف. يرجى مراجعة سجلات البوت.")
+    save_json_file(TRANSFER_LOG_FILE, [])
+    await update.callback_query.message.edit_text("✅ تم حذف جميع سجل التحويلات.")
+    logger.info(f"المشرف {user_id} قام بحذف جميع سجلات التحويلات.")

@@ -4,13 +4,15 @@ from utils.check_balance import get_user_balance
 import datetime
 import json
 import os
-import logging # # إضافة هذا السطر
+import logging
+from utils.data_manager import load_json_file
+from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
 
-logger = logging.getLogger(__name__) # # تعريف logger على مستوى الوحدة
+logger = logging.getLogger(__name__)
 
 # 📌 مسار ملف المشتريات (يفترض وجوده أو إنشاؤه)
-PURCHASES_FILE = "data/purchases.json"
-USERS_FILE = "data/users.json" # # إضافة مسار ملف المستخدمين
+PURCHASES_FILE = os.path.join("data", "purchases.json")
+USERS_FILE = os.path.join("data", "users.json")
 
 # ✅ عرض صفحة الحساب الشخصي
 async def handle_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -22,37 +24,21 @@ async def handle_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # احصل على تاريخ التسجيل (افتراضي)
     first_use_date = "غير متوفر"
-    try:
-        if os.path.exists(USERS_FILE):
-            with open(USERS_FILE, "r", encoding="utf-8") as f:
-                users_data = json.load(f)
-                user_data = users_data.get(user_id, {})
-                if "created_at" in user_data:
-                    first_use_date = user_data["created_at"]
-        else:
-            logger.warning(f"ملف المستخدمين '{USERS_FILE}' غير موجود عند جلب تاريخ التسجيل.")
-    except json.JSONDecodeError:
-        logger.error(f"خطأ في قراءة ملف JSON للمستخدمين '{USERS_FILE}' عند جلب تاريخ التسجيل.", exc_info=True)
-    except Exception as e:
-        logger.error(f"خطأ غير متوقع عند جلب تاريخ تسجيل المستخدم {user_id}: {e}", exc_info=True)
+    users_data = load_json_file(USERS_FILE, {})
+    user_data = users_data.get(user_id, {})
+    if "created_at" in user_data:
+        first_use_date = user_data["created_at"]
+    else:
+        logger.warning(f"ملف المستخدمين '{USERS_FILE}' غير موجود أو المستخدم {user_id} لا يملك تاريخ تسجيل.")
 
 
     # احصائيات الطلبات
     total_orders = 0
     total_spent = 0
-    try:
-        if os.path.exists(PURCHASES_FILE):
-            with open(PURCHASES_FILE, encoding="utf-8") as f:
-                all_orders = json.load(f)
-                user_orders = all_orders.get(user_id, [])
-                total_orders = len(user_orders)
-                total_spent = sum([order.get("price", 0) for order in user_orders])
-        else:
-            logger.warning(f"ملف المشتريات '{PURCHASES_FILE}' غير موجود عند جلب احصائيات الطلبات.")
-    except json.JSONDecodeError:
-        logger.error(f"خطأ في قراءة ملف JSON للمشتريات '{PURCHASES_FILE}' عند جلب احصائيات الطلبات.", exc_info=True)
-    except Exception as e:
-        logger.error(f"خطأ غير متوقع عند جلب احصائيات طلبات المستخدم {user_id}: {e}", exc_info=True)
+    all_orders = load_json_file(PURCHASES_FILE, {})
+    user_orders = all_orders.get(user_id, [])
+    total_orders = len(user_orders)
+    total_spent = sum([order.get("price", 0) for order in user_orders])
 
 
     message = (
@@ -69,12 +55,12 @@ async def handle_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"━━━━━━━━━━━━━━━"
     )
 
-    buttons = InlineKeyboardMarkup([
+    buttons = create_reply_markup([
         [InlineKeyboardButton("🧾 صندوق مشترياتي", callback_data="my_purchases")],
         [InlineKeyboardButton("🏧 سحب الرصيد", callback_data="withdraw_request")],
-        [InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard")]
+        back_button()
     ])
-    
+
     await update.callback_query.message.edit_text(message, reply_markup=buttons, parse_mode="HTML")
     logger.info(f"تم عرض الملف الشخصي للمستخدم {user_id}.")
 
@@ -85,29 +71,8 @@ async def handle_my_purchases(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
 
-    purchases = []
-    try:
-        if not os.path.exists(PURCHASES_FILE):
-            await query.message.edit_text("🗃 لا توجد مشتريات محفوظة حالياً.")
-            logger.info(f"المستخدم {user_id} حاول عرض المشتريات ولكن ملف '{PURCHASES_FILE}' غير موجود.")
-            return
-
-        with open(PURCHASES_FILE, encoding="utf-8") as f:
-            all_orders = json.load(f)
-        purchases = all_orders.get(user_id, [])
-    except json.JSONDecodeError:
-        await query.message.edit_text("❌ حدث خطأ في قراءة سجل المشتريات. يرجى التواصل مع الدعم.")
-        logger.error(f"خطأ في قراءة ملف JSON للمشتريات '{PURCHASES_FILE}' للمستخدم {user_id}.", exc_info=True)
-        return
-    except IOError as e:
-        await query.message.edit_text("❌ حدث خطأ في الوصول إلى سجل المشتريات. يرجى التواصل مع الدعم.")
-        logger.error(f"خطأ في الوصول إلى ملف المشتريات '{PURCHASES_FILE}' للمستخدم {user_id}: {e}", exc_info=True)
-        return
-    except Exception as e:
-        await query.message.edit_text("❌ حدث خطأ غير متوقع عند جلب سجل المشتريات. يرجى التواصل مع الدعم.")
-        logger.error(f"خطأ غير متوقع عند جلب مشتريات المستخدم {user_id}: {e}", exc_info=True)
-        return
-
+    all_orders = load_json_file(PURCHASES_FILE, {})
+    purchases = all_orders.get(user_id, [])
 
     if not purchases:
         await query.message.edit_text("🗃 لا توجد مشتريات محفوظة لحسابك.")
@@ -123,11 +88,11 @@ async def handle_my_purchases(update: Update, context: ContextTypes.DEFAULT_TYPE
         price = order.get("price", 0)
         message += f"• {platform} - {country.upper()} - {price} ر.س\n🕓 {date}\n\n"
 
-    buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 العودة", callback_data="profile")]
+    keyboard = create_reply_markup([
+        back_button(callback_data="profile", text="🔙 العودة")
     ])
 
-    await query.message.edit_text(message, reply_markup=buttons, parse_mode="HTML")
+    await query.message.edit_text(message, reply_markup=keyboard, parse_mode="HTML")
     logger.info(f"تم عرض سجل مشتريات المستخدم {user_id}.")
 
 
@@ -139,9 +104,9 @@ async def show_balance_only(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     balance = get_user_balance(user_id)
 
-    buttons = InlineKeyboardMarkup([
+    buttons = create_reply_markup([
         [InlineKeyboardButton("💳 شحن رصيدي", callback_data="recharge")],
-        [InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard")]
+        back_button()
     ])
 
     await context.bot.send_message(
@@ -171,9 +136,9 @@ async def handle_withdraw_request(update: Update, context: ContextTypes.DEFAULT_
         "📞 في حال وجود أي مشكلة أو استفسار عاجل، يمكنك التواصل مباشرة مع الإدارة:"
     )
 
-    buttons = InlineKeyboardMarkup([
+    buttons = create_reply_markup([
         [InlineKeyboardButton("📬 تواصل مع الإدارة", url="https://t.me/DrRamzi0")],
-        [InlineKeyboardButton("🔙 العودة  ", callback_data="back_to_dashboard")]
+        back_button(text="🔙 العودة")
     ])
 
     await query.message.edit_text(message, reply_markup=buttons, parse_mode="HTML")

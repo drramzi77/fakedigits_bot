@@ -1,10 +1,11 @@
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import InlineKeyboardButton
+from keyboards.utils_kb import back_button # ✅ تم إضافة هذا السطر
 
 def language_keyboard():
-    return InlineKeyboardMarkup([
+    return [
         [
             InlineKeyboardButton("العربية", callback_data="set_lang_ar"),
             InlineKeyboardButton("English", callback_data="set_lang_en")
         ],
-        [InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard")]
-    ])
+        back_button()
+    ]

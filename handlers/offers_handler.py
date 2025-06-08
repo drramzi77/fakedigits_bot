@@ -2,6 +2,7 @@ import json
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.balance import get_user_balance
+from utils.data_manager import load_json_file # ✅ تم إضافة هذا السطر
 
 # ✅ دالة لتحويل كود الدولة إلى علم تلقائي
 def get_flag(country_code):
@@ -12,8 +13,7 @@ def get_flag(country_code):
 
 # ✅ إنشاء أزرار عروض المنصة (واتساب / تليجرام)
 def generate_offer_buttons(platform):
-    with open("data/servers.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
+    data = load_json_file("data/servers.json", []) # ✅ تم التعديل
 
     country_prices = {}
     for item in data:
@@ -48,8 +48,7 @@ async def show_platform_offers(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = update.effective_user.id
     balance = get_user_balance(user_id)
 
-    with open("data/servers.json", "r", encoding="utf-8") as f:
-        all_data = json.load(f)
+    all_data = load_json_file("data/servers.json", []) # ✅ تم التعديل
 
     available_countries = {
         item["country"] for item in all_data if item["platform"].lower() == platform.lower()

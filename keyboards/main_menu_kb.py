@@ -1,9 +1,10 @@
 # keyboards/main_menu_kb.py
 
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import InlineKeyboardButton
+from keyboards.utils_kb import back_button # ✅ تم إضافة هذا السطر
 
 def main_menu_keyboard():
-    return InlineKeyboardMarkup([
+    return [
         [
             InlineKeyboardButton("📞 WhatsApp", callback_data="select_app_WhatsApp"),
             InlineKeyboardButton("✈️ Telegram", callback_data="select_app_Telegram")
@@ -16,8 +17,6 @@ def main_menu_keyboard():
             InlineKeyboardButton("📘 Facebook", callback_data="select_app_Facebook"),
             InlineKeyboardButton("🎵 TikTok", callback_data="select_app_TikTok")
         ],
-        [
-            InlineKeyboardButton("💰 رصيدي", callback_data="check_balance"),
-            InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard")
-        ]
-    ])
+        back_button(text="💰 رصيدي", callback_data="check_balance"),
+        back_button() # هذا الزر سيعود إلى لوحة التحكم الرئيسية (dashboard)
+    ]

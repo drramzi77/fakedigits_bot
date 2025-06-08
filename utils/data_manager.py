@@ -32,8 +32,8 @@ def save_json_file(file_path: str, data):
     يُحفظ البيانات إلى ملف JSON.
     """
     try:
-        # تأكد من وجود المجلد
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        # ✅ تأكد من وجود المجلد
+        os.makedirs(os.path.dirname(file_path), exist_ok=True) # ✅ تم إضافة هذا السطر
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
         logger.info(f"تم حفظ البيانات في ملف JSON '{file_path}'.")

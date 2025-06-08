@@ -4,83 +4,45 @@ import logging
 import re
 from telegram import Update
 from telegram.ext import ContextTypes
-from config import ADMINS # ✅ تم إضافة هذا السطر لاستيراد ADMINS من config.py
+from config import ADMINS
+from utils.data_manager import load_json_file, save_json_file # ✅ تم إضافة هذا السطر
 
 logger = logging.getLogger(__name__)
 
 # ✅ ملف المستخدمين
-USER_FILE = "data/users.json" #
+USER_FILE = os.path.join("data", "users.json")
+
 
 # ✅ جلب الرصيد الحالي
 def get_user_balance(user_id: int) -> float:
-    try:
-        with open(USER_FILE, "r", encoding="utf-8") as f:
-            users = json.load(f)
-        return users.get(str(user_id), {}).get("balance", 0)
-    except FileNotFoundError:
-        logger.warning(f"ملف المستخدمين '{USER_FILE}' غير موجود. سيبدأ برصيد 0 للمستخدم {user_id}.")
-        return 0
-    except json.JSONDecodeError:
-        logger.error(f"خطأ في قراءة ملف JSON للمستخدمين '{USER_FILE}'.", exc_info=True)
-        return 0
-    except Exception as e:
-        logger.error(f"خطأ غير متوقع عند جلب رصيد المستخدم {user_id}: {e}", exc_info=True)
-        return 0
+    users = load_json_file(USER_FILE, default_data={}) # ✅ تم التعديل
+    return users.get(str(user_id), {}).get("balance", 0)
 
 # ✅ تعديل الرصيد مباشرة
 def set_user_balance(user_id: int, new_balance: float):
-    try:
-        users = {}
-        if os.path.exists(USER_FILE):
-            with open(USER_FILE, "r", encoding="utf-8") as f:
-                try:
-                    users = json.load(f)
-                except json.JSONDecodeError:
-                    logger.error(f"ملف المستخدمين '{USER_FILE}' تالف. سيتم إعادة إنشائه.", exc_info=True)
-                    users = {}
-
-        uid = str(user_id)
-        users[uid] = users.get(uid, {})
-        users[uid]["balance"] = round(new_balance, 2)
-
-        with open(USER_FILE, "w", encoding="utf-8") as f:
-            json.dump(users, f, indent=2, ensure_ascii=False)
-        logger.info(f"تم تعيين رصيد المستخدم {user_id} إلى {new_balance}.")
-    except IOError as e:
-        logger.error(f"خطأ في الوصول إلى ملف المستخدمين '{USER_FILE}': {e}", exc_info=True)
-    except Exception as e:
-        logger.error(f"خطأ غير متوقع عند تعيين رصيد المستخدم {user_id}: {e}", exc_info=True)
+    users = load_json_file(USER_FILE, default_data={}) # ✅ تم التعديل
+    uid = str(user_id)
+    users[uid] = users.get(uid, {})
+    users[uid]["balance"] = round(new_balance, 2)
+    save_json_file(USER_FILE, users) # ✅ تم التعديل
+    logger.info(f"تم تعيين رصيد المستخدم {user_id} إلى {new_balance}.") # نقل سجل المعلومات هنا
 
 # ✅ تحديث الرصيد (إضافة أو خصم)
 def update_balance(user_id: int, amount: float):
-    try:
-        users = {}
-        if os.path.exists(USER_FILE):
-            with open(USER_FILE, "r", encoding="utf-8") as f:
-                try:
-                    users = json.load(f)
-                except json.JSONDecodeError:
-                    logger.error(f"ملف المستخدمين '{USER_FILE}' تالف أثناء تحديث الرصيد. سيتم إنشاء جديد.", exc_info=True)
-                    users = {}
+    users = load_json_file(USER_FILE, default_data={}) # ✅ تم التعديل
+    uid = str(user_id)
+    current = users.get(uid, {}).get("balance", 0)
+    users[uid] = users.get(uid, {})
+    users[uid]["balance"] = round(current + amount, 2)
+    save_json_file(USER_FILE, users) # ✅ تم التعديل
+    logger.info(f"تم تحديث رصيد المستخدم {user_id} بمقدار {amount}. الرصيد الجديد: {users[uid]['balance']}.") # نقل سجل المعلومات هنا
 
-        uid = str(user_id)
-        current = users.get(uid, {}).get("balance", 0)
-        users[uid] = users.get(uid, {})
-        users[uid]["balance"] = round(current + amount, 2)
-
-        with open(USER_FILE, "w", encoding="utf-8") as f:
-            json.dump(users, f, indent=2, ensure_ascii=False)
-        logger.info(f"تم تحديث رصيد المستخدم {user_id} بمقدار {amount}. الرصيد الجديد: {users[uid]['balance']}.")
-    except IOError as e:
-        logger.error(f"خطأ في الوصول إلى ملف المستخدمين '{USER_FILE}' أثناء التحديث: {e}", exc_info=True)
-    except Exception as e:
-        logger.error(f"خطأ غير متوقع عند تحديث رصيد المستخدم {user_id}: {e}", exc_info=True)
 
 # ✅ إضافة رصيد (للإدارة فقط)
 async def add_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
-    if user_id not in ADMINS: # ✅ تم التعديل من ADMIN_IDS إلى ADMINS
+    if user_id not in ADMINS:
         await update.message.reply_text("❌ هذا الأمر مخصص فقط للمسؤولين.")
         return
 
@@ -134,7 +96,7 @@ async def add_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def deduct_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
-    if user_id not in ADMINS: # ✅ تم التعديل من ADMIN_IDS إلى ADMINS
+    if user_id not in ADMINS:
         await update.message.reply_text("❌ هذا الأمر مخصص فقط للمسؤولين.")
         return
 

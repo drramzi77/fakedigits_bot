@@ -1,16 +1,17 @@
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
+from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
 
 async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     message = "🌹 مرحباً Dr\\Ramzi 😊\n⌁─━─━ (FakeDigits) ─━─━⌁"
-    keyboard = InlineKeyboardMarkup([
+    keyboard = create_reply_markup([
         [InlineKeyboardButton("📩 - التواصل مع الدعم", callback_data="contact_support")],
         [InlineKeyboardButton("📄 - شرح الاستخدام", callback_data="usage_guide")],
         [InlineKeyboardButton("❓ - الأسئلة الشائعة", callback_data="faq")],
-        [InlineKeyboardButton("🔙 عودة", callback_data="back_to_dashboard")]
+        back_button(text="🔙 عودة")
     ])
 
     await query.message.edit_text(message, reply_markup=keyboard)
@@ -35,8 +36,8 @@ async def handle_usage_guide(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "🔙 يمكنك العودة من الزر التالي."
     )
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 العودة", callback_data="help")]
+    keyboard = create_reply_markup([
+        back_button(callback_data="help", text="🔙 العودة")
     ])
 
     await query.message.edit_text(message, reply_markup=keyboard, parse_mode="HTML")
@@ -54,8 +55,8 @@ async def handle_contact_support(update: Update, context: ContextTypes.DEFAULT_T
         "📌 أرسل استفسارك مع صورة/شرح إن وُجد."
     )
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 العودة", callback_data="help")]
+    keyboard = create_reply_markup([
+        back_button(callback_data="help", text="🔙 العودة")
     ])
 
     await query.message.edit_text(message, reply_markup=keyboard, parse_mode="HTML")
@@ -76,8 +77,8 @@ async def handle_faq(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📩 لمزيد من الأسئلة تواصل مع الدعم."
     )
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 العودة", callback_data="help")]
+    keyboard = create_reply_markup([
+        back_button(callback_data="help", text="🔙 العودة")
     ])
 
     await query.message.edit_text(message, reply_markup=keyboard, parse_mode="HTML")
