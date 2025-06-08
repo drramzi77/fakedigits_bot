@@ -1,11 +1,12 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+from utils.favorites import load_favorites, save_favorites, add_favorite, get_user_favorites # ✅ استيراد الدوال من utils
 
-# ✅ مفضلة المستخدمين (تجريبية)
-USER_FAVORITES = {
-    123456789: ["🇸🇦 WhatsApp - SA", "🇺🇸 Telegram - US"],
-    987654321: ["🇪🇬 WhatsApp - EG"]
-}
+# ✅ إزالة القاموس المؤقت
+# USER_FAVORITES = {
+#     123456789: ["🇸🇦 WhatsApp - SA", "🇺🇸 Telegram - US"],
+#     987654321: ["🇪🇬 WhatsApp - EG"]
+# }
 
 # ✅ عرض المفضلة
 async def handle_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -13,7 +14,7 @@ async def handle_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     user_id = query.from_user.id
-    favorites = USER_FAVORITES.get(user_id, [])
+    favorites = get_user_favorites(user_id) # ✅ استخدام الدالة الجديدة
 
     if not favorites:
         await query.message.edit_text("⭐️ لا توجد أرقام مفضلة محفوظة لديك حالياً.")
@@ -42,12 +43,8 @@ async def add_to_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE):
     flag = ''.join([chr(127397 + ord(c.upper())) for c in country_code])
     entry = f"{flag} {platform} - {country_code.upper()}"
 
-    # أضف إلى المفضلة إذا لم تكن موجودة
-    if user_id not in USER_FAVORITES:
-        USER_FAVORITES[user_id] = []
-
-    if entry not in USER_FAVORITES[user_id]:
-        USER_FAVORITES[user_id].append(entry)
+    # ✅ استخدام الدالة الجديدة لإضافة المفضلة
+    if add_favorite(user_id, entry): # دالة add_favorite تقوم بالتحقق والحفظ تلقائيًا
         await query.message.reply_text("✅ تم إضافة الدولة إلى المفضلة.")
     else:
         await query.message.reply_text("ℹ️ هذه الدولة موجودة مسبقاً في مفضلتك.")
