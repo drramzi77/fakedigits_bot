@@ -15,7 +15,6 @@ from handlers.category_handler import (
 )
 from handlers.transfer_handler import (
     start_transfer,
-    # handle_transfer_input, # ✅ تم إزالة هذا
     show_transfer_logs,
     confirm_clear_transfers,
     clear_all_transfers,
@@ -32,7 +31,7 @@ from handlers.agent_handler import show_agent_info, apply_as_agent
 from handlers.favorites_handler import add_to_favorites, handle_favorites
 from handlers.category_handler import show_available_platforms
 from handlers.offers_handler import show_general_offers, show_whatsapp_offers, show_telegram_offers
-from handlers.quick_search_handler import start_quick_search # handle_text_input # ✅ تم إزالة هذا
+from handlers.quick_search_handler import start_quick_search
 from handlers.help_handler import handle_usage_guide, handle_contact_support, handle_faq, handle_help
 from handlers.language_handler import show_language_options, set_language
 from handlers.main_menu import plus, go_to_buy_number
@@ -41,20 +40,13 @@ from handlers.main_dashboard import show_dashboard, handle_recharge, handle_rech
 # إدارة المستخدمين
 from handlers.admin_users import (
     handle_admin_users,
-    # handle_admin_search, # ✅ تم إزالة هذا
     handle_block_user,
     handle_delete_user,
     handle_edit_user_balance,
-    # receive_balance_input, # ✅ تم إزالة هذا
     confirm_delete_user,
-    back_to_dashboard_clear_admin_search
+    back_to_dashboard_clear_admin_search,
+    ensure_user_exists # ✅ استيراد الدالة الجديدة
 )
-
-# ✅ استيراد موجه المدخلات الجديد
-from handlers.input_router import handle_all_text_input 
-from handlers.transfer_handler import handle_transfer_input # ✅ أعد استيرادها لاستخدامها في router
-from handlers.admin_users import receive_balance_input, handle_admin_search # ✅ أعد استيرادها لاستخدامها في router
-from handlers.quick_search_handler import handle_text_input # ✅ أعد استيرادها لاستخدامها في router
 
 
 # ربح رصيد مجانًا
@@ -75,6 +67,13 @@ from telegram.ext import (
     filters
 )
 
+# ✅ استيراد موجه المدخلات الجديد
+from handlers.input_router import handle_all_text_input
+from handlers.transfer_handler import handle_transfer_input
+from handlers.admin_users import receive_balance_input, handle_admin_search
+from handlers.quick_search_handler import handle_text_input
+
+
 # أزرار الاشتراك
 def subscription_buttons():
     buttons = [[InlineKeyboardButton("🔁 تحقق من الاشتراك", callback_data="check_sub")]]
@@ -84,6 +83,10 @@ def subscription_buttons():
 
 # أمر /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    # ✅ تسجيل/تحديث بيانات المستخدم عند كل أمر /start
+    ensure_user_exists(user.id, user.to_dict())
+
     if await is_user_subscribed(update, context):
         await update.message.reply_text("✅ تم التحقق من اشتراكك.\nاستخدم الأمر /plus للمتابعة.")
     else:
@@ -173,14 +176,7 @@ def main():
     app.add_handler(CallbackQueryHandler(back_to_dashboard_clear_admin_search, pattern="^back_to_dashboard_clear_admin_search$"))
     
     # استلام البيانات (هذه المعالجات يجب أن تكون في نهاية قائمة MessageHandler)
-    # ترتيبها مهم: المعالجات الأكثر تحديداً يجب أن تكون أولاً
-    # يجب أن يكون handle_transfer_input قبل handle_admin_search و receive_balance_input
-    # لأنه يستخدم "awaiting_input" كحالة خاصة به
-    # app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_transfer_input)) # ✅ تم إزالة هذا
-    # app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, receive_balance_input)) # ✅ تم إزالة هذا
-    # app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_admin_search)) # ✅ تم إزالة هذا
-    # app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_input)) # تأكد أن هذا لا يتعارض بشكل مباشر # ✅ تم إزالة هذا
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_all_text_input)) # ✅ إضافة موجه المدخلات الجديد
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_all_text_input))
 
     # كن وكيلا معنا
     app.add_handler(CallbackQueryHandler(show_agent_info, pattern="^become_agent$"))
