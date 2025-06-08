@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from datetime import datetime # ✅ استيراد datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.balance import get_user_balance, set_user_balance
@@ -40,6 +41,45 @@ def save_users(users):
     except Exception as e:
         logger.error(f"خطأ غير متوقع عند حفظ المستخدمين: {e}", exc_info=True)
 
+# ✅ دالة جديدة: ضمان وجود المستخدم في قاعدة البيانات (users.json)
+def ensure_user_exists(user_id: int, user_info: dict):
+    users = load_users()
+    user_id_str = str(user_id)
+
+    if user_id_str not in users:
+        # المستخدم غير موجود، قم بإضافته
+        users[user_id_str] = {
+            "id": user_id,
+            "first_name": user_info.get("first_name", "N/A"),
+            "last_name": user_info.get("last_name", ""),
+            "username": user_info.get("username", ""),
+            "language_code": user_info.get("language_code", "N/A"),
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "balance": 0.0, # ✅ رصيد أولي 0
+            "banned": False # افتراضياً غير محظور
+        }
+        save_users(users)
+        logger.info(f"تم تسجيل مستخدم جديد: {user_id_str} ({user_info.get('username')}).")
+    else:
+        # المستخدم موجود، يمكن تحديث بعض معلوماته إذا لزم الأمر
+        # مثلاً: تحديث الاسم أو اليوزرنيم في حال تغييره
+        current_user_data = users[user_id_str]
+        updated = False
+        if current_user_data.get("first_name") != user_info.get("first_name", "N/A"):
+            current_user_data["first_name"] = user_info.get("first_name", "N/A")
+            updated = True
+        if current_user_data.get("last_name") != user_info.get("last_name", ""):
+            current_user_data["last_name"] = user_info.get("last_name", "")
+            updated = True
+        if current_user_data.get("username") != user_info.get("username", ""):
+            current_user_data["username"] = user_info.get("username", "")
+            updated = True
+        
+        if updated:
+            save_users(users)
+            logger.info(f"تم تحديث معلومات المستخدم {user_id_str}.")
+
+
 # ✅ عرض قائمة المستخدمين مع خيارات الإدارة (بحث، تعديل، حظر، حذف)
 async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -53,8 +93,16 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     for uid, info in users.items():
         username = info.get("name", f"مستخدم {uid}")
-        if search_term in uid.lower() or (username and search_term in username.lower()):
-            results.append((uid, username, info.get("balance", 0), info.get("banned", False)))
+        # إذا لم يكن هناك "name" في الملف، استخدم first_name + last_name
+        if "name" not in info: 
+            display_name = f"{info.get('first_name', '')} {info.get('last_name', '')}".strip()
+            if not display_name:
+                display_name = f"مستخدم {uid}"
+        else:
+            display_name = username
+
+        if search_term in uid.lower() or (display_name and search_term in display_name.lower()) or (info.get("username") and search_term in info.get("username").lower()): # ✅ تحسين البحث ليشمل الاسم واليوزرنيم
+            results.append((uid, display_name, info.get("balance", 0), info.get("banned", False)))
 
     if not results:
         message_text = "❌ لا يوجد مستخدمون مطابقون."
@@ -66,7 +114,7 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
         else:
             await update.message.reply_text(message_text, reply_markup=reply_markup)
         logger.info(f"لا يوجد مستخدمون مطابقون لـ '{search_term}'.")
-        context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة عند عدم وجود نتائج
+        context.user_data.pop("awaiting_input", None)
         return
 
     text = "<b>👥 إدارة المستخدمين</b>\n\n"
@@ -94,19 +142,19 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ✅ دعم البحث داخل الإدارة باسم المستخدم أو الـ ID
 async def handle_admin_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    import config # # استيراد ADMINS من config.py
+    import config
     if user_id not in config.ADMINS:
         await update.message.reply_text("❌ ليس لديك صلاحية للبحث في قائمة المستخدمين.")
         logger.warning(f"المستخدم {user_id} حاول البحث في قائمة المستخدمين بدون صلاحية.")
-        context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة إذا كان غير مصرح
+        context.user_data.pop("awaiting_input", None)
         return
 
     context.user_data["admin_search"] = update.message.text.strip()
     logger.info(f"المشرف {user_id} يبحث عن: '{context.user_data['admin_search']}'.")
     await handle_admin_users(update, context)
-    context.user_data.pop("admin_search_mode", None) # لا يزال من الجيد إزالته هنا
+    context.user_data.pop("admin_search_mode", None)
     context.user_data.pop("admin_search", None)
-    context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة بعد المعالجة، حتى لو لم يجد نتائج
+    context.user_data.pop("awaiting_input", None)
 
 
 # ✅ بدء عملية تعديل رصيد مستخدم معين
@@ -116,7 +164,7 @@ async def handle_edit_user_balance(update: Update, context: ContextTypes.DEFAULT
 
     user_id_to_edit = query.data.split("_")[1]
     context.user_data["editing_user_id"] = user_id_to_edit
-    context.user_data["awaiting_input"] = "admin_balance_edit" # ✅ إضافة الحالة الجديدة للموجه
+    context.user_data["awaiting_input"] = "admin_balance_edit"
     context.user_data.pop("admin_search_mode", None)
     context.user_data.pop("admin_search", None)
     logger.info(f"المشرف {update.effective_user.id} بدأ تعديل رصيد المستخدم: {user_id_to_edit}.")
@@ -134,8 +182,8 @@ async def receive_balance_input(update: Update, context: ContextTypes.DEFAULT_TY
     if not new_balance_str.replace('.', '', 1).isdigit():
         await update.message.reply_text("❌ الرجاء إدخال رقم صالح للرصيد.")
         logger.warning(f"المشرف {user_id} أدخل رصيدًا غير صالح: '{new_balance_str}'.")
-        context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة عند الخطأ
-        context.user_data.pop("editing_user_id", None) # ✅ مسح الحالة عند الخطأ
+        context.user_data.pop("awaiting_input", None)
+        context.user_data.pop("editing_user_id", None)
         return
 
     try:
@@ -143,8 +191,8 @@ async def receive_balance_input(update: Update, context: ContextTypes.DEFAULT_TY
     except ValueError:
         await update.message.reply_text("❌ حدث خطأ في تحويل الرصيد. الرجاء إدخال رقم.")
         logger.error(f"خطأ في تحويل '{new_balance_str}' إلى رقم عشري بواسطة المشرف {user_id}.", exc_info=True)
-        context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة عند الخطأ
-        context.user_data.pop("editing_user_id", None) # ✅ مسح الحالة عند الخطأ
+        context.user_data.pop("awaiting_input", None)
+        context.user_data.pop("editing_user_id", None)
         return
 
     user_id_to_edit = context.user_data.get("editing_user_id")
@@ -160,9 +208,9 @@ async def receive_balance_input(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text("❌ لم يتم العثور على المستخدم المطلوب تعديل رصيده.")
         logger.warning(f"المشرف {user_id} حاول تعديل رصيد مستخدم غير موجود: {user_id_to_edit}.")
 
-    context.user_data.pop("edit_balance_mode", None) # لا يزال من الجيد إزالته هنا
+    context.user_data.pop("edit_balance_mode", None)
     context.user_data.pop("editing_user_id", None)
-    context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة بعد المعالجة
+    context.user_data.pop("awaiting_input", None)
 
 # ✅ تنفيذ الحظر أو فك الحظر
 async def handle_block_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -230,7 +278,7 @@ async def handle_delete_user(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def back_to_dashboard_clear_admin_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    context.user_data.pop("admin_search_mode", None) # لا يزال من الجيد إزالته هنا
+    context.user_data.pop("admin_search_mode", None)
     context.user_data.pop("admin_search", None)
-    context.user_data.pop("awaiting_input", None) # ✅ مسح حالة awaiting_input
+    context.user_data.pop("awaiting_input", None)
     await show_dashboard(update, context)
