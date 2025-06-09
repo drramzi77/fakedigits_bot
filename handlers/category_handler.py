@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 from keyboards.category_kb import category_inline_keyboard
 from utils.data_manager import load_json_file, save_json_file
-from keyboards.utils_kb import back_button, create_reply_markup
+from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم التأكد من استيرادها
 
 logger = logging.getLogger(__name__)
 PURCHASES_FILE = os.path.join("data", "purchases.json")
@@ -139,19 +139,23 @@ async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYP
     user_balance = get_user_balance(user_id)
 
     if current_quantity <= 0:
+        # ✅ تحسين رسالة الخطأ وزر العودة لسيناريو الكمية صفر
         await query.message.edit_text(
-            f"❌ عذراً، لا يوجد أرقام متاحة حالياً في سيرفر <b>{selected['name']}</b> لـ <b>{platform}</b> في <b>{country_code.upper()}</b>.",
+            f"❌ عذراً، لا توجد أرقام متاحة حالياً في سيرفر <b>{selected['name']}</b> لـ <b>{platform}</b> في <b>{country_code.upper()}</b>.\n"
+            f"💰 رصيدك الحالي: {user_balance} ر.س",
             parse_mode="HTML",
             reply_markup=create_reply_markup([
-                back_button(callback_data=f"country_{country_code}_{platform}", text="🔙 العودة لاختيار الدولة")
+                back_button(callback_data=f"country_{country_code}_{platform}", text="🔙 العودة لاختيار دولة/سيرفر آخر")
             ])
         )
         logger.info(f"المستخدم {user_id} حاول شراء سيرفر بكمية 0: {platform}-{country_code}-{server_id}.")
         return
 
     if user_balance < price:
+        # ✅ تحسين رسالة الخطأ وزر العودة لسيناريو الرصيد غير كافٍ
         await query.message.edit_text(
-            f"❌ رصيدك الحالي ({user_balance} ر.س) غير كافٍ لشراء هذا الرقم الذي يكلف {price} ر.س. يرجى شحن رصيدك.",
+            f"❌ رصيدك الحالي ({user_balance} ر.س) غير كافٍ لشراء هذا الرقم الذي يكلف {price} ر.س. يرجى شحن رصيدك.\n"
+            f"👇 يمكنك شحن رصيدك الآن:",
             reply_markup=create_reply_markup([
                 [InlineKeyboardButton("💳 شحن رصيدي", callback_data="recharge")],
                 back_button(callback_data=f"country_{country_code}_{platform}", text="🔙 العودة")
@@ -205,7 +209,6 @@ async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYP
         reply_markup=buttons
     )
     logger.info(f"المستخدم {user_id} اشترى رقماً وهمياً: {fake_number} من سيرفر {selected['name']} بسعر {price}. الكمية المتبقية: {selected['quantity']}.")
-
 
 async def handle_random_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """

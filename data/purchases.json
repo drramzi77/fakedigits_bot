@@ -94,6 +94,28 @@
       "status": "active",
       "date": "2025-06-09 03:33:26",
       "fake_code": "536418"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "sa",
+      "server_name": "💎 سيرفر مميز",
+      "server_id": 3,
+      "price": 9,
+      "fake_number": "966565124691",
+      "status": "active",
+      "date": "2025-06-09 04:40:11",
+      "fake_code": "950781"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "ca",
+      "server_name": "⚡ سيرفر سريع",
+      "server_id": 1,
+      "price": 4,
+      "fake_number": "966562731116",
+      "status": "active",
+      "date": "2025-06-09 04:41:22",
+      "fake_code": "304359"
     }
   ]
 }

@@ -11,7 +11,7 @@ import logging
 from datetime import datetime
 from utils.logger import setup_logging
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup # ✅ تم التأكد من وجودها
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -115,16 +115,25 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     """
     logger.error("Exception while handling an update:", exc_info=context.error)
 
-    # Inform the user in case of an error
+    # إشعار المستخدم برسالة خطأ ودية مع خيار الدعم
     if update and update.effective_message:
         try:
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("💬 تواصل مع الدعم", url="https://t.me/DrRamzi0")],
+                [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+            ])
             await update.effective_message.reply_text(
-                "❌ حدث خطأ غير متوقع! تم إبلاغ المسؤولين. يرجى المحاولة لاحقاً."
+                "❌ عذراً، حدث خطأ غير متوقع! 😔\n"
+                "تم إبلاغ المسؤولين وسنعمل على إصلاحه بأسرع وقت.\n\n"
+                "❓ يمكنك التواصل مع الدعم أو العودة للقائمة الرئيسية.",
+                reply_markup=keyboard,
+                parse_mode="HTML"
             )
         except Exception as e:
-            logger.error(f"Failed to send error message to user: {e}", exc_info=True)
+            logger.error(f"فشل إرسال رسالة الخطأ للمستخدم: {e}", exc_info=True)
 
-    # Optionally, send error details to an admin
+    # إرسال تفاصيل الخطأ للمشرفين
+    # يمكن هنا إضافة المزيد من التصفية للبيانات الحساسة إذا لزم الأمر
     admin_message = (
         f"⚠️ <b>حدث خطأ في البوت!</b>\n\n"
         f"<b>Update:</b> <code>{update}</code>\n"
@@ -138,7 +147,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 parse_mode="HTML"
             )
         except Exception as e:
-            logger.error(f"Failed to send error message to admin {admin_id}: {e}", exc_info=True)
+            logger.error(f"فشل إرسال رسالة الخطأ للمشرف {admin_id}: {e}", exc_info=True)
 
 
 # تشغيل البوت
