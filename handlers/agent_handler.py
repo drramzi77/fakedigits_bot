@@ -1,9 +1,13 @@
+# handlers/agent_handler.py
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from config import ADMINS # ✅ تم التعديل ليصبح استيراد مباشر لـ ADMINS
+from config import ADMINS
 
 # ✅ صفحة كن وكيلاً معنا
 async def show_agent_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعرض معلومات حول برنامج الوكلاء ومميزاته وشروطه.
+    """
     query = update.callback_query
     await query.answer()
 
@@ -36,6 +40,10 @@ async def show_agent_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ✅ استقبال طلب الانضمام كوكيل
 async def apply_as_agent(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج طلب المستخدم للانضمام كوكيل.
+    يرسل تفاصيل الطلب إلى المشرفين.
+    """
     query = update.callback_query
     user = query.from_user
     await query.answer()
@@ -48,7 +56,7 @@ async def apply_as_agent(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🆔 ID: <code>{user.id}</code>\n"
     )
 
-    for admin_id in ADMINS: # ✅ تم التعديل من ADMIN_IDS إلى ADMINS
+    for admin_id in ADMINS:
         await context.bot.send_message(chat_id=admin_id, text=msg, parse_mode="HTML")
 
     await query.message.edit_text(

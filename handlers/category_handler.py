@@ -1,3 +1,4 @@
+# handlers/category_handler.py
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from keyboards.server_kb import load_servers, server_keyboard, load_all_servers_data, save_servers_data
@@ -9,7 +10,7 @@ import logging
 from datetime import datetime
 from keyboards.category_kb import category_inline_keyboard
 from utils.data_manager import load_json_file, save_json_file
-from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
+from keyboards.utils_kb import back_button, create_reply_markup
 
 logger = logging.getLogger(__name__)
 PURCHASES_FILE = os.path.join("data", "purchases.json")
@@ -17,8 +18,11 @@ SERVERS_FILE = os.path.join("data", "servers.json")
 
 PLATFORMS = ["WhatsApp", "Telegram", "Snapchat", "Instagram", "Facebook", "TikTok"]
 
-# ✅ اختيار المنصة
 async def handle_platform_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج النقر على أزرار اختيار المنصة (مثل WhatsApp, Telegram).
+    يوجه المستخدم لاختيار نوع الرقم (عربي، عشوائي، إلخ).
+    """
     query = update.callback_query
     await query.answer()
     data = query.data
@@ -30,8 +34,11 @@ async def handle_platform_buttons(update: Update, context: ContextTypes.DEFAULT_
             reply_markup=category_inline_keyboard(platform)
         )
 
-# ✅ اختيار المنطقة (العرب، آسيا، إلخ)
 async def handle_category_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج اختيار المنطقة (مثل العرب، آسيا، أفريقيا) لشراء الأرقام.
+    يعرض قائمة الدول المتاحة في تلك المنطقة.
+    """
     from keyboards.countries_kb import countries_keyboard
     query = update.callback_query
     await query.answer()
@@ -45,8 +52,11 @@ async def handle_category_selection(update: Update, context: ContextTypes.DEFAUL
             reply_markup=keyboard
         )
 
-# ✅ اختيار الدولة
 async def handle_country_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج اختيار الدولة لشراء الأرقام.
+    يعرض السيرفرات المتاحة لهذه الدولة مع أسعارها وكمياتها.
+    """
     query = update.callback_query
     await query.answer()
     _, country_code, platform = query.data.split("_")
@@ -91,8 +101,11 @@ async def handle_country_selection(update: Update, context: ContextTypes.DEFAULT
     )
     logger.info(f"المستخدم {user_id} يعرض سيرفرات {country_code} لـ {platform}. رصيده: {balance}.")
 
-# ✅ تجربة الشراء (Fake Purchase) مع خصم وهمي وتتبع حالة الرقم
 async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج عملية الشراء الوهمية للرقم.
+    يخصم الرصيد، يقلل الكمية، ويُنشئ سجل شراء مؤقت.
+    """
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
@@ -149,7 +162,7 @@ async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     selected["quantity"] -= 1
-    save_json_file(SERVERS_FILE, all_servers_data)
+    save_servers_data(all_servers_data)
 
     update_balance(user_id, -price)
 
@@ -194,8 +207,11 @@ async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYP
     logger.info(f"المستخدم {user_id} اشترى رقماً وهمياً: {fake_number} من سيرفر {selected['name']} بسعر {price}. الكمية المتبقية: {selected['quantity']}.")
 
 
-# ✅ اختيار الدولة العشوائية
 async def handle_random_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج اختيار دولة عشوائية لشراء الأرقام.
+    يعرض السيرفرات المتاحة في الدولة المختارة عشوائياً.
+    """
     query = update.callback_query
     await query.answer()
     platform = query.data.replace("random_", "")
@@ -245,8 +261,10 @@ async def handle_random_country(update: Update, context: ContextTypes.DEFAULT_TY
     )
     logger.info(f"المستخدم {user_id} يعرض سيرفرات الدولة العشوائية {country_code} لـ {platform}.")
 
-# ✅ الدول المتوفرة فقط (Most Available)
 async def handle_most_available_countries(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج عرض الدول التي تحتوي على أكثر عدد من الأرقام المتاحة لمنصة معينة.
+    """
     query = update.callback_query
     await query.answer()
     platform = query.data.replace("most_", "")
@@ -277,8 +295,10 @@ async def handle_most_available_countries(update: Update, context: ContextTypes.
     )
     logger.info(f"تم عرض الدول الأكثر توفراً لـ {platform}.")
 
-# ✅ إدخال يدوي مثل WhatsApp
 async def handle_platform_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج اختيار المنصة يدوياً عن طريق إرسال اسمها كنص (بدلاً من زر).
+    """
     text = update.message.text.strip().lower()
     mapping = {
         "whatsapp": "WhatsApp",
@@ -299,15 +319,19 @@ async def handle_platform_selection(update: Update, context: ContextTypes.DEFAUL
         reply_markup=category_inline_keyboard(platform)
     )
 
-# ✅ دالة تحويل رمز الدولة إلى علم
 def get_flag(country_code):
+    """
+    يحول رمز كود الدولة (مثل 'sa') إلى علم الدولة (مثل '🇸🇦').
+    """
     try:
         return ''.join([chr(127397 + ord(c.upper())) for c in country_code])
     except:
         return "🏳️"
 
-# ✅ زر المنصات المتاحة الآن
 async def show_available_platforms(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعرض قائمة بالمنصات المتاحة حالياً مع عدد الدول المتوفرة لكل منها.
+    """
     query = update.callback_query
     await query.answer()
 
@@ -346,8 +370,10 @@ async def show_available_platforms(update: Update, context: ContextTypes.DEFAULT
     )
     logger.info("تم عرض المنصات المتاحة حاليا.")
 
-# ✅ عرض الأرقام الفورية الجاهزة
 async def show_ready_numbers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعرض قائمة بالأرقام الفورية الجاهزة للشراء عبر مختلف المنصات والدول.
+    """
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -392,8 +418,11 @@ async def show_ready_numbers(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
     logger.info(f"تم عرض {len(ready_numbers[:10])} أرقام فورية جاهزة للمستخدم {user_id}.")
 
-# ✅ طلب الكود الوهمي
 async def get_fake_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج طلب الحصول على الكود الوهمي لرقم تم شراؤه.
+    يُرسل كوداً وهمياً ويُحدث حالة الرقم إلى 'active'.
+    """
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
@@ -452,8 +481,11 @@ async def get_fake_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"المستخدم {user_id} طلب كودًا وهميًا لرقم {fake_number}. الكود: {fake_code}.")
 
 
-# ✅ إلغاء الرقم الوهمي واسترداد الرصيد
 async def cancel_fake_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج إلغاء الرقم الوهمي واسترداد الرصيد.
+    يُحدث حالة الرقم إلى 'cancelled' ويُعيد الرصيد للمستخدم.
+    """
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
@@ -509,7 +541,7 @@ async def cancel_fake_number(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     s["quantity"] = s.get("quantity", 0) + 1
                     break
             break
-    save_json_file(SERVERS_FILE, all_servers_data)
+    save_servers_data(all_servers_data)
 
     await query.message.edit_text(
         f"✅ تم إلغاء الرقم <code>{fake_number}</code> بنجاح.\n"

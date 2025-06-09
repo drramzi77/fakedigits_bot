@@ -1,7 +1,14 @@
 # main.py
+"""
+بوت الأرقام المؤقتة (Fake Digits Bot)
+
+هذا هو الملف الرئيسي لتشغيل البوت.
+يقوم بتهيئة التطبيق، وتعريف معالجات الأوامر والأزرار،
+وإدارة تفاعلات المستخدمين مع البوت.
+"""
 
 import logging
-from datetime import datetime # قد تحتاجها لبعض السجلات أو الوظائف المستقبلية
+from datetime import datetime
 from utils.logger import setup_logging
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -15,17 +22,16 @@ from telegram.ext import (
 )
 
 # استيرادات Modules المشروع (handlers) - مجمعة ومنظمة
+# ✅ هذه الدوال مستخدمة كـ handlers مباشرة
 from handlers.admin_users import (
     handle_admin_users, handle_block_user, handle_delete_user, handle_edit_user_balance,
-    confirm_delete_user, back_to_dashboard_clear_admin_search, ensure_user_exists,
-    receive_balance_input, handle_admin_search
+    confirm_delete_user, back_to_dashboard_clear_admin_search, ensure_user_exists
 )
 from handlers.agent_handler import show_agent_info, apply_as_agent
 from handlers.category_handler import (
     handle_category_selection, handle_most_available_countries, handle_random_country,
-    handle_platform_selection, handle_platform_buttons, handle_country_selection,
-    handle_fake_purchase, show_ready_numbers, get_fake_code, cancel_fake_number,
-    show_available_platforms # ✅ تم إضافة هذا السطر
+    handle_platform_buttons, handle_country_selection, handle_fake_purchase,
+    show_ready_numbers, get_fake_code, cancel_fake_number, show_available_platforms
 )
 from handlers.earn_credit_handler import show_earn_credit_page, view_referrals
 from handlers.favorites_handler import add_to_favorites, handle_favorites
@@ -35,18 +41,18 @@ from handlers.main_dashboard import show_dashboard, handle_recharge, handle_rech
 from handlers.main_menu import plus, go_to_buy_number
 from handlers.offers_handler import show_general_offers, show_whatsapp_offers, show_telegram_offers
 from handlers.profile_handler import handle_withdraw_request, handle_profile, handle_my_purchases, show_balance_only
-from handlers.quick_search_handler import start_quick_search, handle_text_input
+from handlers.quick_search_handler import start_quick_search
 from handlers.transfer_handler import (
     start_transfer, show_transfer_logs, confirm_clear_transfers,
-    clear_all_transfers, confirm_transfer, handle_transfer_input
+    clear_all_transfers, confirm_transfer
 )
-# استيرادات utils
-from utils.balance import add_balance, deduct_balance, get_user_balance as get_balance_util
+# استيرادات utils - ✅ تم تنظيف الدوال غير المستخدمة هنا
+from utils.balance import add_balance, deduct_balance
 from utils.check_balance import check_balance
 from utils.check_subscription import is_user_subscribed
-from config import BOT_TOKEN, REQUIRED_CHANNELS, ADMINS # تأكد من استيراد ADMINS هنا
+from config import BOT_TOKEN, REQUIRED_CHANNELS, ADMINS
 
-# استيراد موجه المدخلات النصية
+# ✅ هذه الدوال يتم استيرادها الآن مباشرةً من input_router
 from handlers.input_router import handle_all_text_input
 
 
@@ -56,6 +62,9 @@ logger = logging.getLogger(__name__)
 
 # أزرار الاشتراك (لا تزال دالة مساعدة)
 def subscription_buttons():
+    """
+    ينشئ لوحة مفاتيح الأزرار للتحقق من الاشتراك في القنوات المطلوبة.
+    """
     buttons = [[InlineKeyboardButton("🔁 تحقق من الاشتراك", callback_data="check_sub")]]
     for ch in REQUIRED_CHANNELS:
         buttons.append([InlineKeyboardButton(f"📢 اشترك في {ch}", url=f"https://t.me/{ch.lstrip('@')}")])
@@ -63,6 +72,10 @@ def subscription_buttons():
 
 # أمر /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالج الأمر /start.
+    يتحقق من اشتراك المستخدم ويقدم رسالة ترحيبية أو يطلب الاشتراك.
+    """
     user = update.effective_user
     ensure_user_exists(user.id, user.to_dict()) # تسجيل/تحديث بيانات المستخدم عند كل أمر /start
 
@@ -78,6 +91,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # زر التحقق
 async def check_subscription_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالج زر التحقق من الاشتراك.
+    يتحقق مرة أخرى من اشتراك المستخدم بعد النقر على الزر.
+    """
     query = update.callback_query
     await query.answer()
     if await is_user_subscribed(update, context):
@@ -92,7 +109,10 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
 
 # Global error handler
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Log the error and send a message to the user/admin."""
+    """
+    معالج الأخطاء العام للتطبيق.
+    يسجل الأخطاء ويرسل إشعاراً للمستخدم ونسخة للمشرفين.
+    """
     logger.error("Exception while handling an update:", exc_info=context.error)
 
     # Inform the user in case of an error
@@ -110,7 +130,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         f"<b>Update:</b> <code>{update}</code>\n"
         f"<b>Error:</b> <code>{context.error}</code>"
     )
-    for admin_id in ADMINS: # Assuming ADMINS is imported from config
+    for admin_id in ADMINS:
         try:
             await context.bot.send_message(
                 chat_id=admin_id,
@@ -123,6 +143,10 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 # تشغيل البوت
 def main():
+    """
+    الوظيفة الرئيسية لتشغيل البوت.
+    تقوم بإنشاء التطبيق، وإضافة جميع المعالجات، وبدء استلام التحديثات.
+    """
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     # ————————————————————————————————
@@ -130,47 +154,44 @@ def main():
     # ————————————————————————————————
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("plus", show_dashboard))
+    app.add_handler(CommandHandler("balance", check_balance))
     app.add_handler(CommandHandler("add_balance", add_balance))
     app.add_handler(CommandHandler("deduct_balance", deduct_balance))
-    app.add_handler(CommandHandler(
-        "balance", check_balance)) # أمر عرض الرصيد
+
 
     # ————————————————————————————————
     # المعالجات لأزرار Callback Queries
     # ————————————————————————————————
 
-    # الاشتراك
+    # 1. الاشتراك (Subscription Check)
     app.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_sub$"))
 
-    # التنقل الأساسي
+    # 2. التنقل الأساسي (Core Navigation)
     app.add_handler(CallbackQueryHandler(show_dashboard, pattern="^back_to_dashboard$"))
     app.add_handler(CallbackQueryHandler(plus, pattern="^back_to_main$"))
     app.add_handler(CallbackQueryHandler(go_to_buy_number, pattern="^buy_number$"))
+    app.add_handler(CallbackQueryHandler(show_available_platforms, pattern="^available_platforms$"))
 
-    # الشحن والرصيد
+    # 3. إدارة الرصيد (Balance Management)
+    app.add_handler(CallbackQueryHandler(show_balance_only, pattern="^check_balance$"))
     app.add_handler(CallbackQueryHandler(handle_recharge, pattern="^recharge$"))
     app.add_handler(CallbackQueryHandler(handle_recharge_admin, pattern="^recharge_admin$"))
-    app.add_handler(CallbackQueryHandler(show_balance_only, pattern="^check_balance$"))
-    app.add_handler(CallbackQueryHandler(handle_withdraw_request, pattern="^withdraw_request$"))
-
-    # التحويلات
     app.add_handler(CallbackQueryHandler(start_transfer, pattern="^transfer_balance$"))
     app.add_handler(CallbackQueryHandler(confirm_transfer, pattern="^confirm_transfer_"))
-    app.add_handler(CallbackQueryHandler(show_transfer_logs, pattern="^view_transfer_logs$"))
-    app.add_handler(CallbackQueryHandler(confirm_clear_transfers, pattern="^confirm_clear_transfers$"))
-    app.add_handler(CallbackQueryHandler(clear_all_transfers, pattern="^clear_transfers$"))
+    app.add_handler(CallbackQueryHandler(handle_withdraw_request, pattern="^withdraw_request$"))
 
-    # شراء الأرقام والخدمات
+    # 4. شراء الأرقام والخدمات (Number Purchase & Services)
     app.add_handler(CallbackQueryHandler(handle_platform_buttons, pattern="^select_app_"))
     app.add_handler(CallbackQueryHandler(handle_category_selection, pattern="^region_"))
     app.add_handler(CallbackQueryHandler(handle_country_selection, pattern="^country_"))
     app.add_handler(CallbackQueryHandler(handle_most_available_countries, pattern="^most_"))
     app.add_handler(CallbackQueryHandler(handle_random_country, pattern="^random_"))
-    app.add_handler(CallbackQueryHandler(handle_fake_purchase, pattern="^buy_"))
     app.add_handler(CallbackQueryHandler(show_ready_numbers, pattern="^ready_numbers$"))
-    app.add_handler(CallbackQueryHandler(show_available_platforms, pattern="^available_platforms$"))
+    app.add_handler(CallbackQueryHandler(handle_fake_purchase, pattern="^buy_"))
+    app.add_handler(CallbackQueryHandler(get_fake_code, pattern="^get_code_"))
+    app.add_handler(CallbackQueryHandler(cancel_fake_number, pattern="^cancel_number_"))
 
-    # العروض والبحث السريع والمفضلة
+    # 5. العروض والبحث السريع والمفضلة (Offers, Quick Search & Favorites)
     app.add_handler(CallbackQueryHandler(show_general_offers, pattern="^offers$"))
     app.add_handler(CallbackQueryHandler(show_whatsapp_offers, pattern="^wa_offers$"))
     app.add_handler(CallbackQueryHandler(show_telegram_offers, pattern="^tg_offers$"))
@@ -178,42 +199,45 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_favorites, pattern="^favorites$"))
     app.add_handler(CallbackQueryHandler(add_to_favorites, pattern="^fav_"))
 
-    # الملف الشخصي والمساعدة
+    # 6. الملف الشخصي والمشتريات (Profile & Purchases)
     app.add_handler(CallbackQueryHandler(handle_profile, pattern="^profile$"))
     app.add_handler(CallbackQueryHandler(handle_my_purchases, pattern="^my_purchases$"))
+
+    # 7. الدعم والمساعدة (Support & Help)
     app.add_handler(CallbackQueryHandler(handle_help, pattern="^help$"))
     app.add_handler(CallbackQueryHandler(handle_usage_guide, pattern="^usage_guide$"))
     app.add_handler(CallbackQueryHandler(handle_contact_support, pattern="^contact_support$"))
     app.add_handler(CallbackQueryHandler(handle_faq, pattern="^faq$"))
 
-    # اللغة
-    app.add_handler(CallbackQueryHandler(show_language_options, pattern="^change_language$"))
-    app.add_handler(CallbackQueryHandler(set_language, pattern="^set_lang_"))
-
-    # ربح رصيد مجانًا
+    # 8. ربح رصيد مجانًا وكن وكيلاً (Earn Credit & Be an Agent)
     app.add_handler(CallbackQueryHandler(show_earn_credit_page, pattern="^earn_credit$"))
     app.add_handler(CallbackQueryHandler(view_referrals, pattern="^view_referrals$"))
+    app.add_handler(CallbackQueryHandler(show_agent_info, pattern="^become_agent$"))
+    app.add_handler(CallbackQueryHandler(apply_as_agent, pattern="^apply_agent$"))
 
-    # إدارة المستخدمين (للمشرفين)
+    # 9. إدارة المستخدمين (للمشرفين فقط) (Admin User Management)
     app.add_handler(CallbackQueryHandler(handle_admin_users, pattern="^admin_users$"))
     app.add_handler(CallbackQueryHandler(handle_block_user, pattern="^toggleban_"))
     app.add_handler(CallbackQueryHandler(handle_edit_user_balance, pattern="^edit_"))
     app.add_handler(CallbackQueryHandler(confirm_delete_user, pattern="^confirm_delete_"))
     app.add_handler(CallbackQueryHandler(handle_delete_user, pattern="^delete_user_confirmed_"))
     app.add_handler(CallbackQueryHandler(back_to_dashboard_clear_admin_search, pattern="^back_to_dashboard_clear_admin_search$"))
+    app.add_handler(CallbackQueryHandler(show_transfer_logs, pattern="^view_transfer_logs$"))
+    app.add_handler(CallbackQueryHandler(confirm_clear_transfers, pattern="^confirm_clear_transfers$"))
+    app.add_handler(CallbackQueryHandler(clear_all_transfers, pattern="^clear_transfers$"))
 
-    # كن وكيلا معنا
-    app.add_handler(CallbackQueryHandler(show_agent_info, pattern="^become_agent$"))
-    app.add_handler(CallbackQueryHandler(apply_as_agent, pattern="^apply_agent$"))
+    # 10. اللغة (Language)
+    app.add_handler(CallbackQueryHandler(show_language_options, pattern="^change_language$"))
+    app.add_handler(CallbackQueryHandler(set_language, pattern="^set_lang_"))
 
     # ————————————————————————————————
     # معالج الأخطاء (Error Handler)
     # ————————————————————————————————
-    app.add_error_handler(error_handler) # ✅ إضافة معالج الأخطاء هنا
+    app.add_error_handler(error_handler)
 
 
     # ————————————————————————————————
-    # معالج المدخلات النصية (يجب أن يكون في النهاية)
+    # معالجات المدخلات النصية (Text Input Handlers - يجب أن تكون في النهاية)
     # ————————————————————————————————
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_all_text_input))
 

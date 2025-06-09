@@ -5,22 +5,41 @@ import logging
 import os
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from utils.data_manager import load_json_file, save_json_file
-from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
+from keyboards.utils_kb import back_button, create_reply_markup # تأكد من أن هذا الاستيراد موجود
 
 logger = logging.getLogger(__name__)
 
 SERVERS_FILE = os.path.join("data", "servers.json")
 
-# ✅ تحميل بيانات السيرفرات كاملة من ملف JSON
 def load_all_servers_data() -> list:
+    """
+    يُحمّل بيانات جميع السيرفرات المتاحة من ملف JSON.
+
+    Returns:
+        list: قائمة بقواميس بيانات السيرفرات.
+    """
     return load_json_file(SERVERS_FILE, [])
 
-# ✅ حفظ بيانات السيرفرات كاملة إلى ملف JSON
 def save_servers_data(data: list):
+    """
+    يُحفظ بيانات السيرفرات إلى ملف JSON.
+
+    Args:
+        data (list): قائمة بقواميس بيانات السيرفرات المراد حفظها.
+    """
     save_json_file(SERVERS_FILE, data)
 
-# ✅ تحميل السيرفرات لمنصة ودولة معينة (مع تصفية الكمية)
 def load_servers(platform: str, country_code: str) -> list:
+    """
+    يُحمّل السيرفرات المتاحة لمنصة ودولة معينتين (الكمية > 0 فقط).
+
+    Args:
+        platform (str): اسم المنصة (مثال: "WhatsApp").
+        country_code (str): رمز كود الدولة (مثال: "sa").
+
+    Returns:
+        list: قائمة بالسيرفرات المتوفرة التي تتطابق مع المعايير.
+    """
     all_data = load_all_servers_data()
     for entry in all_data:
         if entry["platform"] == platform and entry["country"] == country_code:
@@ -29,8 +48,17 @@ def load_servers(platform: str, country_code: str) -> list:
             return available_servers
     return []
 
-# ✅ إنشاء لوحة السيرفرات بأيقونات مميزة
 def server_keyboard(platform: str, country_code: str) -> InlineKeyboardMarkup:
+    """
+    ينشئ لوحة مفاتيح الأزرار لعرض السيرفرات المتاحة لمنصة ودولة محددتين.
+
+    Args:
+        platform (str): اسم المنصة.
+        country_code (str): رمز كود الدولة.
+
+    Returns:
+        InlineKeyboardMarkup: لوحة المفاتيح المضمّنة بالسيرفرات.
+    """
     servers = load_servers(platform, country_code)
 
     buttons = []
@@ -38,7 +66,6 @@ def server_keyboard(platform: str, country_code: str) -> InlineKeyboardMarkup:
 
     for i, server in enumerate(servers):
         emoji = emoji_cycle[i % len(emoji_cycle)]
-        # # نعرض الكمية المتبقية
         label = f"{emoji} {server['name']} - 💰 {server['price']} ر.س ({server.get('quantity', 0)} متاح)"
         callback = f"buy_{platform}_{country_code}_{server['id']}"
         buttons.append([InlineKeyboardButton(label, callback_data=callback)])

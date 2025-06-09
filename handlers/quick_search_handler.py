@@ -5,7 +5,7 @@ from telegram.ext import ContextTypes
 from keyboards.server_kb import load_servers
 from utils.balance import get_user_balance
 from utils.data_manager import load_json_file
-from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
+from keyboards.utils_kb import back_button, create_reply_markup
 
 
 # ✅ خريطة البحث باللغتين
@@ -29,8 +29,11 @@ ALL_COUNTRIES = {
     "الإمارات": "ae", "uae": "ae", "🇦🇪": "ae"
 }
 
-# ✅ عند الضغط على "البحث السريع"
 async def start_quick_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يبدأ عملية البحث السريع عن الأرقام.
+    يطلب من المستخدم إرسال اسم الدولة للبحث عنها.
+    """
     query = update.callback_query
     await query.answer()
     context.user_data["awaiting_country_input"] = True
@@ -43,8 +46,11 @@ async def start_quick_search(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ])
     )
 
-# ✅ عندما يكتب المستخدم اسم الدولة
 async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج إدخال المستخدم لاسم الدولة في وضع البحث السريع.
+    يعرض السيرفرات المتاحة للدولة والمنصة المختارة.
+    """
     user_id = update.effective_user.id
 
     text = update.message.text.strip().lower()

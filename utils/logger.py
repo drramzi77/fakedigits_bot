@@ -5,8 +5,8 @@ from datetime import datetime
 def setup_logging():
     """
     يقوم بتهيئة نظام التسجيل (logging) للبوت.
-    - يسجل الرسائل في ملف log.txt
-    - يعرض الرسائل في وحدة التحكم (console)
+    - يسجل الرسائل في ملف log.txt داخل مجلد 'logs/'.
+    - يعرض الرسائل في وحدة التحكم (console).
     """
     log_directory = "logs"
     if not os.path.exists(log_directory):

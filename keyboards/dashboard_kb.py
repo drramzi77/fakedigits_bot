@@ -4,6 +4,17 @@ from config import ADMINS
 
 
 def dashboard_keyboard(user_id=None):
+    """
+    ينشئ لوحة التحكم الرئيسية للبوت مع جميع الخيارات المتاحة للمستخدمين.
+    يتضمن أزرارًا إضافية خاصة بالمشرفين.
+
+    Args:
+        user_id (int, optional): معرف المستخدم. يُستخدم لتحديد ما إذا كان المستخدم مشرفاً.
+                                 الافتراضي هو None.
+
+    Returns:
+        InlineKeyboardMarkup: لوحة التحكم الرئيسية المضمّنة.
+    """
     buttons = [
 
         # 🥇 القسم الأول: الخدمات الأساسية
@@ -25,7 +36,7 @@ def dashboard_keyboard(user_id=None):
         # 🧰 أدوات سريعة
         [
             InlineKeyboardButton("🔎 البحث السريع", callback_data="quick_search"),
-            InlineKeyboardButton("⭐️ المفضلة", callback_data="favorites")  # ✅ تم إضافة زر المفضلة هنا
+            InlineKeyboardButton("⭐️ المفضلة", callback_data="favorites")
         ],
          [InlineKeyboardButton("🚀 أرقام فورية جاهزة", callback_data="ready_numbers")],
 

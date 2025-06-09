@@ -1,10 +1,13 @@
+# handlers/favorites_handler.py
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.favorites import add_favorite, get_user_favorites
-from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
+from keyboards.utils_kb import back_button, create_reply_markup
 
-# ✅ عرض المفضلة
 async def handle_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعرض قائمة الدول المفضلة المحفوظة للمستخدم.
+    """
     query = update.callback_query
     await query.answer()
 
@@ -24,8 +27,10 @@ async def handle_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
     await query.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
 
-# ✅ إضافة إلى المفضلة
 async def add_to_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج إضافة دولة إلى قائمة المفضلة الخاصة بالمستخدم.
+    """
     query = update.callback_query
     await query.answer()
 
@@ -40,7 +45,6 @@ async def add_to_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE):
     flag = ''.join([chr(127397 + ord(c.upper())) for c in country_code])
     entry = f"{flag} {platform} - {country_code.upper()}"
 
-    # ✅ استخدام الدالة الجديدة لإضافة المفضلة
     if add_favorite(user_id, entry):
         await query.message.reply_text("✅ تم إضافة الدولة إلى المفضلة.")
     else:

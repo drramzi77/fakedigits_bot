@@ -6,7 +6,7 @@ import json
 import os
 import logging
 from utils.data_manager import load_json_file
-from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
+from keyboards.utils_kb import back_button, create_reply_markup
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +14,11 @@ logger = logging.getLogger(__name__)
 PURCHASES_FILE = os.path.join("data", "purchases.json")
 USERS_FILE = os.path.join("data", "users.json")
 
-# ✅ عرض صفحة الحساب الشخصي
 async def handle_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج طلب عرض الملف الشخصي للمستخدم.
+    يعرض معلومات الحساب مثل الاسم، المعرف، الرصيد، وتاريخ التسجيل، وإحصائيات الطلبات.
+    """
     user = update.effective_user
     user_id = str(user.id)
     username = f"@{user.username}" if user.username else "لا يوجد"
@@ -65,8 +68,11 @@ async def handle_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"تم عرض الملف الشخصي للمستخدم {user_id}.")
 
 
-# ✅ عرض سجل المشتريات
 async def handle_my_purchases(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج طلب عرض سجل مشتريات المستخدم.
+    يعرض آخر 5 مشتريات للمستخدم.
+    """
     user_id = str(update.effective_user.id)
     query = update.callback_query
     await query.answer()
@@ -80,8 +86,7 @@ async def handle_my_purchases(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     message = "📦 <b>سجل مشترياتك</b>:\n━━━━━━━━━━━━━━━\n"
-    # عرض آخر 5 فقط
-    for order in purchases[-5:]:
+    for order in purchases[-5:]: # عرض آخر 5 فقط
         date = order.get("date", "❓")
         platform = order.get("platform", "❓")
         country = order.get("country", "❓")
@@ -96,8 +101,10 @@ async def handle_my_purchases(update: Update, context: ContextTypes.DEFAULT_TYPE
     logger.info(f"تم عرض سجل مشتريات المستخدم {user_id}.")
 
 
-# ✅ عرض الرصيد فقط
 async def show_balance_only(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج طلب عرض الرصيد الحالي للمستخدم فقط.
+    """
     query = update.callback_query
     await query.answer()
 
@@ -119,8 +126,11 @@ async def show_balance_only(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"المستخدم {user_id} طلب عرض الرصيد فقط: {balance} ر.س.")
 
 
-# ✅ صفحة طلب سحب الرصيد
 async def handle_withdraw_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج طلب عرض صفحة سحب الرصيد.
+    يوجه المستخدم لإرسال بيانات السحب ويتيح التواصل مع الإدارة.
+    """
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id

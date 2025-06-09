@@ -1,9 +1,15 @@
 # keyboards/main_menu_kb.py
 
 from telegram import InlineKeyboardButton
-from keyboards.utils_kb import back_button # ✅ تم إضافة هذا السطر
+from keyboards.utils_kb import back_button # تأكد من أن هذا الاستيراد موجود
 
 def main_menu_keyboard():
+    """
+    ينشئ لوحة مفاتيح الأزرار الرئيسية لاختيار المنصة.
+
+    Returns:
+        list: قائمة بصفوف الأزرار.
+    """
     return [
         [
             InlineKeyboardButton("📞 WhatsApp", callback_data="select_app_WhatsApp"),

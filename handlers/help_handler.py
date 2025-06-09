@@ -1,8 +1,12 @@
+# handlers/help_handler.py
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
-from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
+from keyboards.utils_kb import back_button, create_reply_markup
 
 async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعرض قائمة خيارات الدعم والمساعدة للمستخدم.
+    """
     query = update.callback_query
     await query.answer()
 
@@ -18,6 +22,9 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_usage_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعرض شرحاً مفصلاً لكيفية استخدام البوت وخطوات شراء الأرقام.
+    """
     query = update.callback_query
     await query.answer()
 
@@ -42,8 +49,10 @@ async def handle_usage_guide(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     await query.message.edit_text(message, reply_markup=keyboard, parse_mode="HTML")
 
-# ✅ التواصل مع الدعم
 async def handle_contact_support(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعرض معلومات الاتصال بالدعم الفني للبوت.
+    """
     query = update.callback_query
     await query.answer()
 
@@ -61,8 +70,10 @@ async def handle_contact_support(update: Update, context: ContextTypes.DEFAULT_T
 
     await query.message.edit_text(message, reply_markup=keyboard, parse_mode="HTML")
 
-# ✅ الأسئلة الشائعة (FAQ)
 async def handle_faq(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعرض الأسئلة الشائعة وإجاباتها حول استخدام البوت.
+    """
     query = update.callback_query
     await query.answer()
 

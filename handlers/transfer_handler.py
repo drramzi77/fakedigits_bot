@@ -9,21 +9,31 @@ from telegram.ext import ContextTypes
 from utils.balance import get_user_balance, update_balance
 from config import ADMINS
 from utils.data_manager import load_json_file, save_json_file
-from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
+from keyboards.utils_kb import back_button, create_reply_markup
 
 logger = logging.getLogger(__name__)
 
 TRANSFER_LOG_FILE = os.path.join("data", "transfers.json")
 
-# 🔘 زر تواصل مع الإدارة
 def contact_admin_button():
+    """
+    ينشئ لوحة مفاتيح صغيرة بزر للتواصل مع الدعم.
+    """
     return create_reply_markup([
         [InlineKeyboardButton("💬 تواصل مع الدعم", url="https://t.me/DrRamzi0")],
         back_button()
     ])
 
-# 📁 سجل التحويلات
 def log_transfer(sender_id, target_id, amount, fee):
+    """
+    يسجل تفاصيل عملية تحويل الرصيد في ملف سجل التحويلات.
+
+    Args:
+        sender_id (int): معرف المستخدم الذي أرسل الرصيد.
+        target_id (int): معرف المستخدم الذي استقبل الرصيد.
+        amount (float): المبلغ الذي تم تحويله.
+        fee (float): قيمة العمولة المخصومة من التحويل.
+    """
     transfer = {
         "from": sender_id,
         "to": target_id,
@@ -37,8 +47,12 @@ def log_transfer(sender_id, target_id, amount, fee):
     save_json_file(TRANSFER_LOG_FILE, data)
     logger.info(f"تم تسجيل تحويل: من {sender_id} إلى {target_id} بمبلغ {amount}.")
 
-# ✅ عند الضغط على زر "تحويل الرصيد"
+
 async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يبدأ عملية تحويل الرصيد.
+    يتحقق من رصيد المستخدم ويطلب معرف المستلم والمبلغ.
+    """
     user_id = update.effective_user.id
     balance = get_user_balance(user_id)
 
@@ -92,8 +106,11 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"المستخدم {user_id} بدأ عملية تحويل الرصيد. رصيده الحالي: {balance}.")
 
 
-# ✅ معالجة مدخلات التحويل وطلب التأكيد
 async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج المدخل النصي من المستخدم لعملية التحويل.
+    يتحقق من صحة المعرف والمبلغ ويطلب التأكيد.
+    """
     user_id = update.effective_user.id
     logger.info(f"handle_transfer_input: المستخدم {user_id} أرسل نص: '{update.message.text}'. user_data: {context.user_data}")
 
@@ -199,8 +216,10 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
     logger.info(f"المستخدم {user_id} على وشك تحويل {amount} إلى {target_id}. يطلب التأكيد.")
 
 
-# ✅ تنفيذ التحويل الفعلي بعد التأكيد
 async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    ينفذ عملية تحويل الرصيد الفعلية بعد تأكيد المستخدم.
+    """
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
@@ -287,8 +306,10 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("awaiting_input", None)
 
 
-# ✅ عرض سجل التحويلات (للمشرفين فقط)
 async def show_transfer_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعرض آخر 10 تحويلات رصيد بين المستخدمين (للمشرفين فقط).
+    """
     user_id = update.effective_user.id
 
     if user_id not in ADMINS:
@@ -325,6 +346,9 @@ async def show_transfer_logs(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def confirm_clear_transfers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يطلب تأكيد من المشرف قبل حذف جميع سجلات التحويلات.
+    """
     user_id = update.effective_user.id
     if user_id not in ADMINS:
         await update.callback_query.answer("❌ غير مصرح لك.", show_alert=True)
@@ -346,6 +370,9 @@ async def confirm_clear_transfers(update: Update, context: ContextTypes.DEFAULT_
 
 
 async def clear_all_transfers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    ينفذ حذف جميع سجلات التحويلات بعد تأكيد المشرف.
+    """
     user_id = update.effective_user.id
     if user_id not in ADMINS:
         await update.callback_query.answer("❌ غير مصرح لك.", show_alert=True)

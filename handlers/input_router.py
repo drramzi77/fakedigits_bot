@@ -13,28 +13,26 @@ from handlers.quick_search_handler import handle_text_input as quick_search_text
 logger = logging.getLogger(__name__)
 
 async def handle_all_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالج عام لجميع المدخلات النصية غير الأوامر.
+    يقوم بتوجيه الرسالة إلى المعالج المناسب بناءً على حالة المستخدم المخزنة.
+    """
     user_id = update.effective_user.id
     user_message = update.message.text
-    
+
     awaiting_input_type = context.user_data.get("awaiting_input", "none")
 
     logger.info(f"handle_all_text_input: المستخدم {user_id} أرسل نص: '{user_message}'. نوع المدخل المنتظر: '{awaiting_input_type}'. user_data: {context.user_data}")
 
     if awaiting_input_type == "transfer_amount":
-        # context.user_data.pop("awaiting_input", None) # ❌ أزل هذا السطر
         await transfer_handler(update, context)
     elif awaiting_input_type == "admin_balance_edit":
-        # context.user_data.pop("awaiting_input", None) # ❌ أزل هذا السطر
         await balance_input_handler(update, context)
     elif awaiting_input_type == "admin_user_search":
-        # context.user_data.pop("awaiting_input", None) # ❌ أزل هذا السطر
         await admin_search_handler(update, context)
     elif awaiting_input_type == "quick_search_country_general":
-        # context.user_data.pop("awaiting_input", None) # ❌ أزل هذا السطر
         await quick_search_text_handler(update, context)
     else:
         logger.warning(f"handle_all_text_input: المستخدم {user_id} أرسل نصًا غير متوقع: '{user_message}'. لا يوجد نوع إدخال منتظر.")
         await update.message.reply_text("👋 عفواً، لم أفهم طلبك. يرجى استخدام الأوامر أو الأزرار المتاحة.")
-    
-    # لا تقم بمسح awaiting_input هنا أيضاً، دع الدالة المعالجة تقوم بذلك.
-    return True
+        context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة عند رسالة غير متوقعة

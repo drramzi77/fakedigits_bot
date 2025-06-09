@@ -1,3 +1,4 @@
+# handlers/admin_users.py
 import json
 import logging
 import os
@@ -7,28 +8,44 @@ from telegram.ext import ContextTypes
 from utils.balance import get_user_balance, set_user_balance
 from handlers.main_dashboard import show_dashboard
 from utils.data_manager import load_json_file, save_json_file
-from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
+from keyboards.utils_kb import back_button, create_reply_markup
 
 logger = logging.getLogger(__name__)
 
 # 📁 مسار ملف المستخدمين
 USER_FILE = os.path.join("data", "users.json")
 
-# ✅ تحميل بيانات المستخدمين من الملف
 def load_users():
+    """
+    يُحمّل بيانات جميع المستخدمين من ملف JSON.
+
+    Returns:
+        dict: قاموس يحتوي على بيانات المستخدمين، أو قاموس فارغ إذا تعذر التحميل.
+    """
     return load_json_file(USER_FILE, {})
 
-# ✅ حفظ بيانات المستخدمين بعد التعديل
 def save_users(users):
+    """
+    يُحفظ بيانات المستخدمين إلى ملف JSON.
+
+    Args:
+        users (dict): قاموس يحتوي على بيانات المستخدمين المراد حفظها.
+    """
     save_json_file(USER_FILE, users)
 
-# ✅ دالة جديدة: ضمان وجود المستخدم في قاعدة البيانات (users.json)
 def ensure_user_exists(user_id: int, user_info: dict):
+    """
+    يتأكد من وجود المستخدم في قاعدة البيانات (users.json)، ويضيفه إذا كان جديداً.
+    يقوم بتحديث معلومات المستخدم الحالية (الاسم، اليوزرنيم) إذا تغيرت.
+
+    Args:
+        user_id (int): معرف المستخدم في تيليجرام.
+        user_info (dict): قاموس يحتوي على معلومات المستخدم (مثل first_name, last_name, username, language_code).
+    """
     users = load_json_file(USER_FILE, {})
     user_id_str = str(user_id)
 
     if user_id_str not in users:
-        # المستخدم غير موجود، قم بإضافته
         users[user_id_str] = {
             "id": user_id,
             "first_name": user_info.get("first_name", "N/A"),
@@ -42,8 +59,6 @@ def ensure_user_exists(user_id: int, user_info: dict):
         save_json_file(USER_FILE, users)
         logger.info(f"تم تسجيل مستخدم جديد: {user_id_str} ({user_info.get('username')}).")
     else:
-        # المستخدم موجود، يمكن تحديث بعض معلوماته إذا لزم الأمر
-        # مثلاً: تحديث الاسم أو اليوزرنيم في حال تغييره
         current_user_data = users[user_id_str]
         updated = False
         if current_user_data.get("first_name") != user_info.get("first_name", "N/A"):
@@ -61,8 +76,11 @@ def ensure_user_exists(user_id: int, user_info: dict):
             logger.info(f"تم تحديث معلومات المستخدم {user_id_str}.")
 
 
-# ✅ عرض قائمة المستخدمين مع خيارات الإدارة (بحث، تعديل، حظر، حذف)
 async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج عرض لوحة إدارة المستخدمين للمشرفين.
+    يسمح بالبحث عن المستخدمين وعرض معلوماتهم الأساسية.
+    """
     query = update.callback_query
     if query:
         await query.answer()
@@ -74,7 +92,6 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     for uid, info in users.items():
         username = info.get("name", f"مستخدم {uid}")
-        # إذا لم يكن هناك "name" في الملف، استخدم first_name + last_name
         if "name" not in info:
             display_name = f"{info.get('first_name', '')} {info.get('last_name', '')}".strip()
             if not display_name:
@@ -120,8 +137,11 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
     logger.info(f"تم عرض قائمة المستخدمين الإدارية لـ '{search_term}'.")
 
 
-# ✅ دعم البحث داخل الإدارة باسم المستخدم أو الـ ID
 async def handle_admin_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج البحث عن المستخدمين داخل لوحة إدارة المشرفين.
+    يتم تفعيله عندما يكون awaiting_input="admin_user_search".
+    """
     user_id = update.effective_user.id
     import config
     if user_id not in config.ADMINS:
@@ -138,8 +158,11 @@ async def handle_admin_search(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data.pop("awaiting_input", None)
 
 
-# ✅ بدء عملية تعديل رصيد مستخدم معين
 async def handle_edit_user_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يبدأ عملية تعديل رصيد مستخدم معين.
+    يطلب من المشرف إدخال الرصيد الجديد.
+    """
     query = update.callback_query
     await query.answer()
 
@@ -155,8 +178,11 @@ async def handle_edit_user_balance(update: Update, context: ContextTypes.DEFAULT
         parse_mode="HTML"
     )
 
-# ✅ استلام قيمة الرصيد الجديدة وتحديثها
 async def receive_balance_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يستقبل قيمة الرصيد الجديدة من المشرف ويقوم بتحديثها للمستخدم المستهدف.
+    يتم تفعيله عندما يكون awaiting_input="admin_balance_edit".
+    """
     new_balance_str = update.message.text.strip()
     user_id = update.effective_user.id
 
@@ -193,8 +219,11 @@ async def receive_balance_input(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data.pop("editing_user_id", None)
     context.user_data.pop("awaiting_input", None)
 
-# ✅ تنفيذ الحظر أو فك الحظر
 async def handle_block_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج حظر المستخدم أو فك الحظر عنه.
+    يتم تفعيله من لوحة إدارة المستخدمين.
+    """
     query = update.callback_query
     await query.answer()
 
@@ -214,8 +243,10 @@ async def handle_block_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.warning(f"المشرف {admin_id} حاول حظر/فك حظر مستخدم غير موجود: {user_id_to_toggle}.")
 
 
-# ✅ طلب تأكيد حذف المستخدم
 async def confirm_delete_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يطلب تأكيد حذف المستخدم من المشرف قبل التنفيذ النهائي.
+    """
     query = update.callback_query
     await query.answer()
 
@@ -237,8 +268,10 @@ async def confirm_delete_user(update: Update, context: ContextTypes.DEFAULT_TYPE
     logger.warning(f"المشرف {admin_id} طلب تأكيد حذف المستخدم {user_id_to_delete}.")
 
 
-# ✅ تنفيذ الحذف النهائي للمستخدم (بعد التأكيد)
 async def handle_delete_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    ينفذ حذف المستخدم بشكل دائم من قاعدة البيانات بعد التأكيد.
+    """
     query = update.callback_query
     await query.answer()
 
@@ -255,8 +288,10 @@ async def handle_delete_user(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.edit_message_text("❌ المستخدم غير موجود.")
         logger.warning(f"المشرف {admin_id} حاول حذف مستخدم غير موجود بعد التأكيد: {user_id_to_delete}.")
 
-# # دالة لمسح وضع البحث والعودة إلى لوحة التحكم
 async def back_to_dashboard_clear_admin_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعيد المشرف إلى لوحة التحكم الرئيسية بعد مسح أي وضع بحث إداري نشط.
+    """
     query = update.callback_query
     await query.answer()
     context.user_data.pop("admin_search_mode", None)

@@ -1,11 +1,15 @@
+# handlers/main_dashboard.py
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 from keyboards.dashboard_kb import dashboard_keyboard
 from utils.check_balance import get_user_balance
-from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
+from keyboards.utils_kb import back_button, create_reply_markup
 
-# ✅ عرض القائمة الرئيسية
 async def show_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعرض لوحة التحكم الرئيسية للبوت للمستخدم.
+    يتضمن معلومات الرصيد ومعرف المستخدم.
+    """
     user = update.effective_user
     user_id = user.id
     balance = get_user_balance(user_id)
@@ -30,9 +34,10 @@ async def show_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message, reply_markup=dashboard_keyboard(user_id), parse_mode="HTML"
         )
 
-
-# ✅ قائمة الأزرار السفلية الخاصة بالشحن
 def recharge_options_keyboard():
+    """
+    ينشئ لوحة مفاتيح الأزرار لخيارات شحن الرصيد.
+    """
     return create_reply_markup([
         [
             InlineKeyboardButton("🧑‍💼 شحن من الإدارة", callback_data="recharge_admin")
@@ -41,8 +46,11 @@ def recharge_options_keyboard():
     ])
 
 
-# ✅ الرسالة الرئيسية عند الضغط على "شحن رصيدك"
 async def handle_recharge(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج النقر على زر "شحن رصيدي".
+    يعرض للمستخدم طرق الدفع المتاحة وكيفية شحن الرصيد.
+    """
     query = update.callback_query
     await query.answer()
 
@@ -74,9 +82,11 @@ async def handle_recharge(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
-
-# ✅ رسالة خاصة عند الضغط على "شحن من الإدارة"
 async def handle_recharge_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج النقر على زر "شحن من الإدارة".
+    يوجه المستخدم للتواصل مباشرة مع المطور لشحن الرصيد يدوياً.
+    """
     query = update.callback_query
     await query.answer()
 

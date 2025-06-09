@@ -3,8 +3,10 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-# ✅ صفحة ربح رصيد مجانًا
 async def show_earn_credit_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعرض صفحة "اربح رصيد مجانًا" للمستخدم، مع كود الإحالة الخاص به ومعلومات المكافأة.
+    """
     query = update.callback_query
     await query.answer()
 
@@ -32,8 +34,10 @@ async def show_earn_credit_page(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
 
-# ✅ عرض قائمة المدعوين (مؤقتًا بدون قاعدة بيانات)
 async def view_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعرض قائمة وهمية بالمدعوين عبر كود الإحالة (في انتظار الربط بقاعدة بيانات).
+    """
     query = update.callback_query
     await query.answer()
 

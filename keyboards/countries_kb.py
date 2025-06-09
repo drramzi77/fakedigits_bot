@@ -1,7 +1,7 @@
 # keyboards/countries_kb.py
 
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
-from keyboards.utils_kb import back_button, create_reply_markup # ✅ تم إضافة هذا السطر
+from keyboards.utils_kb import back_button, create_reply_markup # تأكد من أن هذا الاستيراد موجود
 
 # ✅ قائمة الدول حسب المناطق
 ARAB_COUNTRIES = [
@@ -64,6 +64,16 @@ AUSTRALIA_COUNTRIES = [
 
 # ✅ الدالة العامة التي تُستخدم من handler
 def countries_keyboard(region: str, platform: str):
+    """
+    ينشئ لوحة مفاتيح أزرار الدول بناءً على المنطقة والمنصة المحددة.
+
+    Args:
+        region (str): المنطقة الجغرافية (مثل "arab", "africa", "asia").
+        platform (str): اسم المنصة (مثل "WhatsApp", "Telegram").
+
+    Returns:
+        InlineKeyboardMarkup: لوحة المفاتيح المضمّنة بالدول.
+    """
     regions = {
         "arab": ARAB_COUNTRIES,
         "africa": AFRICA_COUNTRIES,

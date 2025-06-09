@@ -1,19 +1,25 @@
+# handlers/offers_handler.py
 import json
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.balance import get_user_balance
-from utils.data_manager import load_json_file # ✅ تم إضافة هذا السطر
+from utils.data_manager import load_json_file
 
-# ✅ دالة لتحويل كود الدولة إلى علم تلقائي
 def get_flag(country_code):
+    """
+    يحول رمز كود الدولة (مثل 'sa') إلى رمز تعبيري للعلم (مثل '🇸🇦').
+    """
     try:
         return ''.join([chr(127397 + ord(c.upper())) for c in country_code])
     except:
         return "🏳️"
 
-# ✅ إنشاء أزرار عروض المنصة (واتساب / تليجرام)
 def generate_offer_buttons(platform):
-    data = load_json_file("data/servers.json", []) # ✅ تم التعديل
+    """
+    ينشئ لوحة مفاتيح الأزرار لعروض دولة معينة لمنصة محددة.
+    يعرض أرخص سعر لكل دولة متوفرة.
+    """
+    data = load_json_file("data/servers.json", [])
 
     country_prices = {}
     for item in data:
@@ -43,12 +49,14 @@ def generate_offer_buttons(platform):
     buttons.append([InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard")])
     return InlineKeyboardMarkup(buttons)
 
-# ✅ دالة عرض عروض المنصة
 async def show_platform_offers(update: Update, context: ContextTypes.DEFAULT_TYPE, platform: str):
+    """
+    يعرض عروض الأرقام لمنصة محددة (مثل WhatsApp أو Telegram).
+    """
     user_id = update.effective_user.id
     balance = get_user_balance(user_id)
 
-    all_data = load_json_file("data/servers.json", []) # ✅ تم التعديل
+    all_data = load_json_file("data/servers.json", [])
 
     available_countries = {
         item["country"] for item in all_data if item["platform"].lower() == platform.lower()
@@ -67,18 +75,24 @@ async def show_platform_offers(update: Update, context: ContextTypes.DEFAULT_TYP
         text, reply_markup=generate_offer_buttons(platform), parse_mode="HTML"
     )
 
-# ✅ handler لعروض واتساب
 async def show_whatsapp_offers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج النقر على زر "عروض واتساب" لعرض العروض الخاصة بالمنصة.
+    """
     await update.callback_query.answer()
     await show_platform_offers(update, context, "WhatsApp")
 
-# ✅ handler لعروض تليجرام
 async def show_telegram_offers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعالج النقر على زر "عروض تليجرام" لعرض العروض الخاصة بالمنصة.
+    """
     await update.callback_query.answer()
     await show_platform_offers(update, context, "Telegram")
 
-# ✅ handler لعروض الأرقام العامة
 async def show_general_offers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    يعرض صفحة العروض العامة، ويطلب من المستخدم اختيار منصة محددة لرؤية عروضها.
+    """
     await update.callback_query.answer()
     text = (
         "🎯 <b>عروض الأرقام المتوفرة:</b>\n\n"
