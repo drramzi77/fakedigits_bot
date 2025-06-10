@@ -1,7 +1,10 @@
 # handlers/agent_handler.py
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from config import ADMINS
+from config import ADMINS, DEFAULT_LANGUAGE # # تم إضافة DEFAULT_LANGUAGE
+from utils.i18n import get_messages # # تم إضافة هذا السطر لاستيراد دالة جلب النصوص
+from keyboards.utils_kb import back_button # # تم إضافة هذا السطر لاستخدام زر العودة الموحد
 
 # ✅ صفحة كن وكيلاً معنا
 async def show_agent_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -11,25 +14,28 @@ async def show_agent_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE) # # تحديد لغة المستخدم
+    messages = get_messages(lang_code) # # جلب النصوص باللغة المطلوبة
+
     text = (
-        "🤝 <b>فرصتك لتكون وكيلًا معتمدًا لدينا!</b>\n\n"
-        "✅ <b>مميزات الوكلاء:</b>\n"
-        "• تسعيرات حصرية أقل من المستخدم العادي.\n"
-        "• لوحة تحكم متقدمة لمتابعة المستخدمين.\n"
-        "• ربح تلقائي من عمليات عملائك.\n"
-        "• دعم فني مباشر وأولوية في الرد.\n\n"
-        "💼 <b>مثال على الربح:</b>\n"
-        "إذا أشرف الوكيل على 10 مستخدمين، وكل واحد استخدم رصيدًا بقيمة 50 ر.س:\n"
-        "🪙 <b>الربح الشهري:</b> 100 ر.س (نسبة 20%)\n\n"
-        "📌 <b>الشروط:</b>\n"
-        "• أن يكون لديك مستخدمين حقيقيين.\n"
-        "• الالتزام بشروط الاستخدام.\n\n"
-        "إذا كنت مهتمًا، اضغط على الزر أدناه وسنتواصل معك."
+        messages["agent_program_title"] + "\n\n" + # # استخدام النص المترجم
+        messages["agent_benefits_title"] + "\n" + # # استخدام النص المترجم
+        messages["agent_benefit_1"] + "\n" + # # استخدام النص المترجم
+        messages["agent_benefit_2"] + "\n" + # # استخدام النص المترجم
+        messages["agent_benefit_3"] + "\n" + # # استخدام النص المترجم
+        messages["agent_benefit_4"] + "\n\n" + # # استخدام النص المترجم
+        messages["agent_profit_example_title"] + "\n" + # # استخدام النص المترجم
+        messages["agent_profit_example_scenario"] + "\n" + # # استخدام النص المترجم
+        messages["agent_monthly_profit"].format(profit="100", currency=messages["price_currency"], commission_percentage="20") + "\n\n" + # # استخدام النص المترجم
+        messages["agent_terms_title"] + "\n" + # # استخدام النص المترجم
+        messages["agent_term_1"] + "\n" + # # استخدام النص المترجم
+        messages["agent_term_2"] + "\n\n" + # # استخدام النص المترجم
+        messages["agent_call_to_action"] # # استخدام النص المترجم
     )
 
     buttons = [
-        [InlineKeyboardButton("📩 إرسال طلب الانضمام", callback_data="apply_agent")],
-        [InlineKeyboardButton("🔙 العودة", callback_data="back_to_dashboard")]
+        [InlineKeyboardButton(messages["send_agent_request_button"], callback_data="apply_agent")], # # استخدام النص المترجم
+        back_button(text=messages["back_button_text"], callback_data="back_to_dashboard", lang_code=lang_code) # # استخدام زر العودة الموحد
     ]
 
     await query.message.edit_text(
@@ -48,21 +54,24 @@ async def apply_as_agent(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = query.from_user
     await query.answer()
 
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE) # # تحديد لغة المستخدم
+    messages = get_messages(lang_code) # # جلب النصوص باللغة المطلوبة
+
     # إرسال الطلب إلى المشرفين
     msg = (
-        f"📬 <b>طلب وكيل جديد</b>\n\n"
-        f"👤 الاسم: {user.full_name}\n"
-        f"🆔 المعرف: @{user.username if user.username else 'لا يوجد'}\n"
-        f"🆔 ID: <code>{user.id}</code>\n"
+        messages["new_agent_request_title"] + "\n\n" + # # استخدام النص المترجم
+        messages["agent_request_name"].format(full_name=user.full_name) + "\n" + # # استخدام النص المترجم
+        messages["agent_request_username"].format(username=user.username if user.username else messages["not_available"]) + "\n" + # # استخدام النص المترجم
+        messages["agent_request_id"].format(user_id=user.id) # # استخدام النص المترجم
     )
 
     for admin_id in ADMINS:
         await context.bot.send_message(chat_id=admin_id, text=msg, parse_mode="HTML")
 
     await query.message.edit_text(
-        "✅ تم إرسال طلبك إلى الإدارة بنجاح.\n"
-        "📌 سنقوم بمراجعة الطلب والتواصل معك قريبًا بإذن الله.",
+        messages["agent_request_sent_success"] + "\n" + # # استخدام النص المترجم
+        messages["agent_request_review_notice"], # # استخدام النص المترجم
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 العودة إلى القائمة", callback_data="back_to_dashboard")]
+            back_button(text=messages["back_to_dashboard_button_text"], callback_data="back_to_dashboard", lang_code=lang_code) # # استخدام زر العودة الموحد
         ])
     )

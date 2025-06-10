@@ -3,6 +3,8 @@
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes
+from utils.i18n import get_messages # # تم إضافة هذا السطر لاستيراد دالة جلب النصوص
+from config import DEFAULT_LANGUAGE # # تم إضافة هذا السطر لاستيراد اللغة الافتراضية
 
 # # استيراد جميع دوال معالجة المدخلات النصية الممكنة
 from handlers.transfer_handler import handle_transfer_input as transfer_handler
@@ -20,6 +22,9 @@ async def handle_all_text_input(update: Update, context: ContextTypes.DEFAULT_TY
     user_id = update.effective_user.id
     user_message = update.message.text
 
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE) # # تحديد لغة المستخدم
+    messages = get_messages(lang_code) # # جلب النصوص باللغة المطلوبة
+
     awaiting_input_type = context.user_data.get("awaiting_input", "none")
 
     logger.info(f"handle_all_text_input: المستخدم {user_id} أرسل نص: '{user_message}'. نوع المدخل المنتظر: '{awaiting_input_type}'. user_data: {context.user_data}")
@@ -34,5 +39,5 @@ async def handle_all_text_input(update: Update, context: ContextTypes.DEFAULT_TY
         await quick_search_text_handler(update, context)
     else:
         logger.warning(f"handle_all_text_input: المستخدم {user_id} أرسل نصًا غير متوقع: '{user_message}'. لا يوجد نوع إدخال منتظر.")
-        await update.message.reply_text("👋 عفواً، لم أفهم طلبك. يرجى استخدام الأوامر أو الأزرار المتاحة.")
+        await update.message.reply_text(messages["unrecognized_text_input"]) # # استخدام النص المترجم
         context.user_data.pop("awaiting_input", None) # ✅ مسح الحالة عند رسالة غير متوقعة

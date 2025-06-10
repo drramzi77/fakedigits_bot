@@ -1,9 +1,12 @@
 # handlers/language_handler.py
+
 from telegram import Update
 from telegram.ext import ContextTypes
 from keyboards.language_kb import language_keyboard
 from handlers.main_dashboard import show_dashboard
-from keyboards.utils_kb import back_button, create_reply_markup
+from keyboards.utils_kb import back_button, create_reply_markup # # تم التأكد من استيرادها
+from utils.i18n import get_messages # # تم إضافة هذا السطر لاستيراد دالة جلب النصوص
+from config import DEFAULT_LANGUAGE # # تم إضافة هذا السطر لاستيراد اللغة الافتراضية
 
 async def show_language_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -11,9 +14,14 @@ async def show_language_options(update: Update, context: ContextTypes.DEFAULT_TY
     """
     query = update.callback_query
     await query.answer()
+
+    # # تحديد لغة المستخدم الحالية لجلب نصوص الأزرار بشكل صحيح
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
+
     await query.message.edit_text(
-        "🌐 اختر اللغة التي تفضل استخدامها في البوت:\n\nChoose the bot language:",
-        reply_markup=create_reply_markup(language_keyboard())
+        messages["select_your_language"], # # استخدام النص المترجم
+        reply_markup=create_reply_markup(language_keyboard(lang_code)) # # تمرير lang_code
     )
 
 async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -21,12 +29,22 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     يعالج تعيين لغة البوت المفضلة للمستخدم.
     """
     query = update.callback_query
-    lang = query.data
-    context.user_data["lang"] = "ar" if "ar" in lang else "en"
+    await query.answer() # # يجب أن يتم الإجابة على الكويري أولاً
 
-    msg = "✅ تم تعيين اللغة إلى العربية." if "ar" in lang else "✅ Language set to English."
-    await query.answer()
-    await query.message.edit_text(msg)
+    lang_code_selected = query.data.replace("set_lang_", "") # # الحصول على كود اللغة من الـ callback_data
+    
+    # # تحديث لغة المستخدم في context.user_data
+    context.user_data["lang_code"] = lang_code_selected 
+    
+    messages = get_messages(lang_code_selected) # # جلب النصوص باللغة الجديدة
 
-    # العودة إلى القائمة الرئيسية
+    # # استخدام النصوص المترجمة للتأكيد
+    if lang_code_selected == "ar":
+        confirmation_msg = messages["language_changed_to_arabic"]
+    else: # assuming 'en' is the other option
+        confirmation_msg = messages["language_changed_to_english"]
+    
+    await query.message.edit_text(confirmation_msg)
+
+    # العودة إلى القائمة الرئيسية (الآن ستظهر باللغة الجديدة)
     await show_dashboard(update, context)

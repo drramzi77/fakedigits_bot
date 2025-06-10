@@ -3,7 +3,9 @@ import logging
 import os
 from telegram import Update
 from telegram.ext import ContextTypes
-from config import ADMINS # تأكد من أن هذا الاستيراد موجود
+from config import ADMINS, DEFAULT_LANGUAGE # # تم إضافة DEFAULT_LANGUAGE
+from utils.data_manager import load_json_file # ✅ تم التأكد من الوجود والآن سيتم استخدامه لـ load_json_file
+from utils.i18n import get_messages # # تم إضافة هذا السطر لاستيراد دالة جلب النصوص
 
 logger = logging.getLogger(__name__)
 
@@ -18,19 +20,13 @@ def get_user_balance(user_id: int) -> float:
     Returns:
         float: رصيد المستخدم، أو 0 إذا لم يتم العثور على المستخدم أو الملف.
     """
+    # # هذه الدالة ستتغير لاحقاً لاستخدام قاعدة البيانات
     try:
-        with open(os.path.join("data", "users.json"), "r", encoding="utf-8") as f:
-            users = json.load(f)
-        return users.get(str(user_id), {}).get("balance", 0)
-    except FileNotFoundError:
-        logger.warning(f"ملف المستخدمين 'data/users.json' غير موجود. سيبدأ رصيد المستخدم {user_id} بـ 0.")
-        return 0
-    except json.JSONDecodeError:
-        logger.error(f"خطأ في قراءة ملف JSON للمستخدمين 'data/users.json'. الملف قد يكون تالفًا.", exc_info=True)
-        return 0
-    except Exception as e:
-        logger.error(f"خطأ غير متوقع عند جلب رصيد المستخدم {user_id} في check_balance: {e}", exc_info=True)
-        return 0
+        users = load_json_file(os.path.join("data", "users.json"), default_data={})
+        return users.get(str(user_id), {}).get("balance", 0.0)
+    except Exception as e: # # يمكن أن تكون FileNotFoundError أو json.JSONDecodeError
+        logger.error(f"خطأ عند جلب رصيد المستخدم {user_id} من ملف JSON: {e}", exc_info=True)
+        return 0.0
 
 # ✅ أمر /balance
 async def check_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -46,14 +42,22 @@ async def check_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     requester_id = user.id
 
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
+
     # إذا لم يتم تمرير معرف مستخدم، نعرض الرصيد لنفس المستخدم
     if not context.args:
         balance = get_user_balance(requester_id)
         name = user.username if user.username else f"{user.first_name} {user.last_name or ''}"
+        
         await update.message.reply_text(
-            f"👤 المستخدم: {name}\n"
-            f"🆔 المعرف: <code>{requester_id}</code>\n"
-            f"💰 الرصيد الحالي: {balance} ر.س", parse_mode="HTML"
+            messages["my_balance_info"].format(
+                name=name,
+                user_id=requester_id,
+                balance=balance,
+                currency=messages["price_currency"]
+            ),
+            parse_mode="HTML"
         )
         return
 
@@ -68,14 +72,18 @@ async def check_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 name = member.user.username if member.user.username else f"{member.user.first_name} {member.user.last_name or ''}"
             except Exception as e:
                 logger.warning(f"لم يتمكن البوت من جلب معلومات المستخدم {target_id} (ربما ليس في المجموعة/خاص): {e}")
-                name = "غير معروف (ربما ليس في المجموعة)"
+                name = messages["unknown_user_in_group"] # # استخدام النص المترجم
 
             await update.message.reply_text(
-                f"👤 المستخدم: {name}\n"
-                f"🆔 المعرف: <code>{target_id}</code>\n"
-                f"💰 الرصيد: {balance} ر.س", parse_mode="HTML"
+                messages["user_balance_info"].format(
+                    name=name,
+                    user_id=target_id,
+                    balance=balance,
+                    currency=messages["price_currency"]
+                ),
+                parse_mode="HTML"
             )
         except ValueError:
-            await update.message.reply_text("❌ أدخل معرفًا صالحًا مثل: /balance 123456789")
+            await update.message.reply_text(messages["invalid_user_id_balance_command"]) # # استخدام النص المترجم
     else:
-        await update.message.reply_text("❌ ليس لديك صلاحية لعرض رصيد الآخرين.")
+        await update.message.reply_text(messages["no_permission_to_view_others_balance"]) # # استخدام النص المترجم

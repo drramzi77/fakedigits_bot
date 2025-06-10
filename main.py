@@ -10,8 +10,10 @@
 import logging
 from datetime import datetime
 from utils.logger import setup_logging
+from utils.i18n import get_messages
+import html # # تم إضافة هذا السطر لاستيراد مكتبة html
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup # ✅ تم التأكد من وجودها
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -50,7 +52,8 @@ from handlers.transfer_handler import (
 from utils.balance import add_balance, deduct_balance
 from utils.check_balance import check_balance
 from utils.check_subscription import is_user_subscribed
-from config import BOT_TOKEN, REQUIRED_CHANNELS, ADMINS
+from config import BOT_TOKEN, REQUIRED_CHANNELS, ADMINS, DEFAULT_LANGUAGE
+
 
 # ✅ هذه الدوال يتم استيرادها الآن مباشرةً من input_router
 from handlers.input_router import handle_all_text_input
@@ -61,13 +64,15 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 # أزرار الاشتراك (لا تزال دالة مساعدة)
-def subscription_buttons():
+def subscription_buttons(lang_code: str = DEFAULT_LANGUAGE):
     """
     ينشئ لوحة مفاتيح الأزرار للتحقق من الاشتراك في القنوات المطلوبة.
     """
-    buttons = [[InlineKeyboardButton("🔁 تحقق من الاشتراك", callback_data="check_sub")]]
+    messages = get_messages(lang_code)
+
+    buttons = [[InlineKeyboardButton(messages["check_subscription_button"], callback_data="check_sub")]]
     for ch in REQUIRED_CHANNELS:
-        buttons.append([InlineKeyboardButton(f"📢 اشترك في {ch}", url=f"https://t.me/{ch.lstrip('@')}")])
+        buttons.append([InlineKeyboardButton(f"📢 {messages['subscribe_to_channel']} {ch}", url=f"https://t.me/{ch.lstrip('@')}")])
     return InlineKeyboardMarkup(buttons)
 
 # أمر /start
@@ -77,34 +82,37 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     يتحقق من اشتراك المستخدم ويقدم رسالة ترحيبية أو يطلب الاشتراك.
     """
     user = update.effective_user
-    ensure_user_exists(user.id, user.to_dict()) # تسجيل/تحديث بيانات المستخدم عند كل أمر /start
+    ensure_user_exists(user.id, user.to_dict())
+
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
 
     if await is_user_subscribed(update, context):
-        await update.message.reply_text("✅ تم التحقق من اشتراكك.\nاستخدم الأمر /plus للمتابعة.")
+        await update.message.reply_text(messages["subscribed_success"])
     else:
         await update.message.reply_text(
-            "📢 لضمان حصولك على الأرقام المميزة أولاً بأول، يرجى الاشتراك في القناة الرسمية للبوت.\n\n"
-            "🔒 الاشتراك ضروري لتفعيل خدمات البوت والاستفادة الكاملة.\n"
-            "👇 قم بالاشتراك ثم اضغط على زر 'تحقق من الاشتراك' بالأسفل:",
-            reply_markup=subscription_buttons()
+            messages["not_subscribed_channel"].format(channel_link=REQUIRED_CHANNELS[0]), # # استخدام أول قناة كـ link
+            reply_markup=subscription_buttons(lang_code)
         )
 
 # زر التحقق
-async def check_subscription_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def check_subscription_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     معالج زر التحقق من الاشتراك.
     يتحقق مرة أخرى من اشتراك المستخدم بعد النقر على الزر.
     """
     query = update.callback_query
     await query.answer()
+
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
+
     if await is_user_subscribed(update, context):
-        await query.edit_message_text("✅ تم التحقق من اشتراكك.\nاستخدم الأمر /plus للمتابعة.")
+        await query.edit_message_text(messages["subscribed_success"])
     else:
         await query.edit_message_text(
-            "❗ لم نتمكن من التحقق من اشتراكك حتى الآن.\n"
-            "✅ تأكد من أنك اشتركت في القناة المطلوبة.\n"
-            "🔄 بعد الاشتراك، اضغط على الزر بالأسفل لإعادة التحقق.",
-            reply_markup=subscription_buttons()
+            messages["not_subscribed_channel_retry"].format(channel_link=REQUIRED_CHANNELS[0]), # # استخدام أول قناة كـ link
+            reply_markup=subscription_buttons(lang_code)
         )
 
 # Global error handler
@@ -115,17 +123,24 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     """
     logger.error("Exception while handling an update:", exc_info=context.error)
 
+    # تحديد لغة المستخدم قبل جلب النصوص
+    lang_code = None
+    if update.effective_user:
+        user_id = update.effective_user.id
+        lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+
+    messages = get_messages(lang_code if lang_code else DEFAULT_LANGUAGE)
+
+
     # إشعار المستخدم برسالة خطأ ودية مع خيار الدعم
     if update and update.effective_message:
         try:
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("💬 تواصل مع الدعم", url="https://t.me/DrRamzi0")],
-                [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_dashboard")]
+                [InlineKeyboardButton(messages["contact_support_button_error"], url="https://t.me/DrRamzi0")],
+                [InlineKeyboardButton(messages["back_to_main_menu_error"], callback_data="back_to_dashboard")]
             ])
             await update.effective_message.reply_text(
-                "❌ عذراً، حدث خطأ غير متوقع! 😔\n"
-                "تم إبلاغ المسؤولين وسنعمل على إصلاحه بأسرع وقت.\n\n"
-                "❓ يمكنك التواصل مع الدعم أو العودة للقائمة الرئيسية.",
+                messages["error_processing_request_user"],
                 reply_markup=keyboard,
                 parse_mode="HTML"
             )
@@ -133,11 +148,10 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             logger.error(f"فشل إرسال رسالة الخطأ للمستخدم: {e}", exc_info=True)
 
     # إرسال تفاصيل الخطأ للمشرفين
-    # يمكن هنا إضافة المزيد من التصفية للبيانات الحساسة إذا لزم الأمر
     admin_message = (
-        f"⚠️ <b>حدث خطأ في البوت!</b>\n\n"
-        f"<b>Update:</b> <code>{update}</code>\n"
-        f"<b>Error:</b> <code>{context.error}</code>"
+        f"⚠️ <b>{messages['bot_error_alert']}</b>\n\n"
+        f"<b>{messages['update_info']}:</b> <code>{html.escape(str(update))}</code>\n" # # تم تأمين نص Update
+        f"<b>{messages['error_details']}:</b> <code>{html.escape(str(context.error))}</code>" # # تم تأمين نص Error
     )
     for admin_id in ADMINS:
         try:
@@ -173,7 +187,7 @@ def main():
     # ————————————————————————————————
 
     # 1. الاشتراك (Subscription Check)
-    app.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_sub$"))
+    app.add_handler(CallbackQueryHandler(check_subscription_button_handler, pattern="^check_sub$"))
 
     # 2. التنقل الأساسي (Core Navigation)
     app.add_handler(CallbackQueryHandler(show_dashboard, pattern="^back_to_dashboard$"))

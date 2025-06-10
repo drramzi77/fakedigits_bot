@@ -6,22 +6,24 @@ import os
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from utils.balance import get_user_balance, update_balance
-from config import ADMINS
-from utils.data_manager import load_json_file, save_json_file
+from utils.balance import get_user_balance, update_balance # # هذه الدوال ستتغير مع DB
+from config import ADMINS, DEFAULT_LANGUAGE # # تم إضافة DEFAULT_LANGUAGE
+from utils.data_manager import load_json_file, save_json_file # # هذه الدوال ستتغير مع DB
 from keyboards.utils_kb import back_button, create_reply_markup
+from utils.i18n import get_messages # # تم إضافة هذا السطر لاستيراد دالة جلب النصوص
 
 logger = logging.getLogger(__name__)
 
-TRANSFER_LOG_FILE = os.path.join("data", "transfers.json")
+TRANSFER_LOG_FILE = os.path.join("data", "transfers.json") # # هذا المسار سيتغير لاحقاً مع DB
 
-def contact_admin_button():
+def contact_admin_button(lang_code: str = DEFAULT_LANGUAGE): # # تم إضافة معامل lang_code
     """
     ينشئ لوحة مفاتيح صغيرة بزر للتواصل مع الدعم.
     """
+    messages = get_messages(lang_code) # # جلب النصوص باللغة المطلوبة
     return create_reply_markup([
-        [InlineKeyboardButton("💬 تواصل مع الدعم", url="https://t.me/DrRamzi0")],
-        back_button()
+        [InlineKeyboardButton(messages["contact_support_button_transfer"], url="https://t.me/DrRamzi0")], # # استخدام النص المترجم
+        back_button(text=messages["back_button_text"], lang_code=lang_code) # # استخدام النص المترجم وتمرير lang_code
     ])
 
 def log_transfer(sender_id, target_id, amount, fee):
@@ -34,6 +36,7 @@ def log_transfer(sender_id, target_id, amount, fee):
         amount (float): المبلغ الذي تم تحويله.
         fee (float): قيمة العمولة المخصومة من التحويل.
     """
+    # # هذه الدالة ستتغير لاحقاً لاستخدام قاعدة البيانات
     transfer = {
         "from": sender_id,
         "to": target_id,
@@ -54,7 +57,10 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     يتحقق من رصيد المستخدم ويطلب معرف المستلم والمبلغ.
     """
     user_id = update.effective_user.id
-    balance = get_user_balance(user_id)
+    balance = get_user_balance(user_id) # # هذه الدالة ستتغير لاحقاً
+
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
 
     logger.info(f"start_transfer: المستخدم {user_id} ضغط على تحويل الرصيد. user_data قبل التعديل: {context.user_data}")
 
@@ -67,40 +73,37 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id in ADMINS:
         logger.warning(f"المشرف {user_id} حاول استخدام خيار تحويل الرصيد الخاص بالمستخدمين.")
         await message_editor(
-            "⚠️ هذا الخيار مخصص فقط للمستخدمين.\n"
-            "🔋 لشحن رصيد مستخدم، استخدم القسم المخصص لذلك في لوحة التحكم.",
+            messages["admin_transfer_warning"], # # استخدام النص المترجم
             parse_mode="HTML",
             reply_markup=create_reply_markup([
-                back_button()
+                back_button(text=messages["back_button_text"], lang_code=lang_code) # # تمرير lang_code
             ])
         )
         return
 
-    if balance < 5:
+    if balance < 5: # # الرقم 5 يمكن أن يكون متغيرًا في config لاحقاً
         msg = (
-            "❌ - لا يمكنك تحويل الرصيد الآن.\n"
-            f"📊 - رصيدك الحالي: <b>{balance} ر.س</b>\n"
-            "💸 - عمولة التحويل: <b>1%</b>\n\n"
-            "🔄 <b>ما الحل؟</b>\n"
-            "1️⃣ قم بشحن رصيدك.\n"
-            "2️⃣ أو تواصل مع الدعم عبر الزر: 💬"
+            messages["transfer_balance_too_low"].format(balance=balance, currency=messages["price_currency"]) + "\n" + # # استخدام النص المترجم
+            messages["transfer_fee_info"].format(fee_percentage="1") + "\n\n" + # # استخدام النص المترجم
+            messages["transfer_solution_prompt"] + "\n" + # # استخدام النص المترجم
+            messages["transfer_solution_recharge"] + "\n" + # # استخدام النص المترجم
+            messages["transfer_solution_contact_support"] # # استخدام النص المترجم
         )
-        await message_editor(msg, parse_mode="HTML", reply_markup=contact_admin_button())
+        await message_editor(msg, parse_mode="HTML", reply_markup=contact_admin_button(lang_code)) # # تمرير lang_code
     else:
         context.user_data["transfer_stage"] = "awaiting_input"
         context.user_data["awaiting_input"] = "transfer_amount"
         logger.info(f"start_transfer: تم تعيين transfer_stage لـ {user_id} إلى 'awaiting_input' و awaiting_input إلى 'transfer_amount'. user_data بعد التعديل: {context.user_data}")
         await message_editor(
-            f"💰 رصيدك الحالي: <b>{balance} ر.س</b>\n\n"
-            "🔁 <b>تحويل الرصيد</b>\n\n"
-            "📥 أرسل المعرف والمبلغ بالشكل التالي:\n\n"
-            "<code>123456789 20</code>\n\n"
-            "✅ <b>123456789</b>: معرف المستخدم\n"
-            "✅ <b>20</b>: المبلغ المطلوب تحويله\n"
-            "💸 عمولة التحويل: <b>1%</b>",
+            messages["transfer_initial_prompt"].format(balance=balance, currency=messages["price_currency"]) + "\n\n" + # # استخدام النص المترجم
+            messages["transfer_format_instruction"] + "\n\n" + # # استخدام النص المترجم
+            messages["transfer_example"] + "\n\n" + # # استخدام النص المترجم
+            messages["transfer_id_explanation"] + "\n" + # # استخدام النص المترجم
+            messages["transfer_amount_explanation"] + "\n" + # # استخدام النص المترجم
+            messages["transfer_fee_info"].format(fee_percentage="1"), # # استخدام النص المترجم
             parse_mode="HTML",
             reply_markup=create_reply_markup([
-                [InlineKeyboardButton("❌ إلغاء", callback_data="back_to_dashboard")]
+                [InlineKeyboardButton(messages["cancel_button_text"], callback_data="back_to_dashboard")] # # استخدام النص المترجم
             ])
         )
         logger.info(f"المستخدم {user_id} بدأ عملية تحويل الرصيد. رصيده الحالي: {balance}.")
@@ -114,15 +117,18 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
     user_id = update.effective_user.id
     logger.info(f"handle_transfer_input: المستخدم {user_id} أرسل نص: '{update.message.text}'. user_data: {context.user_data}")
 
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
+
     text = update.message.text.strip()
     parts = text.split()
 
     if len(parts) != 2:
         await update.message.reply_text(
-            "❌ الصيغة غير صحيحة. استخدم:\n<code>123456789 20</code>",
+            messages["transfer_invalid_format_error"], # # استخدام النص المترجم
             parse_mode="HTML",
             reply_markup=create_reply_markup([
-                back_button()
+                back_button(text=messages["back_button_text"], lang_code=lang_code) # # تمرير lang_code
             ])
         )
         context.user_data.pop("transfer_stage", None)
@@ -136,9 +142,9 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
     except ValueError as e:
         logger.warning(f"المستخدم {user_id} أدخل معرفًا أو مبلغًا غير رقمي للتحويل: '{text}'. الخطأ: {e}")
         await update.message.reply_text(
-            "❌ تأكد من أن المعرف والمبلغ أرقام صحيحة.",
+            messages["transfer_invalid_id_or_amount"], # # استخدام النص المترجم
             reply_markup=create_reply_markup([
-                back_button()
+                back_button(text=messages["back_button_text"], lang_code=lang_code) # # تمرير lang_code
             ])
         )
         context.user_data.pop("transfer_stage", None)
@@ -147,9 +153,9 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
 
     if target_id == user_id:
         await update.message.reply_text(
-            "❌ لا يمكنك تحويل الرصيد إلى نفسك.",
+            messages["cannot_transfer_to_self"], # # استخدام النص المترجم
             reply_markup=create_reply_markup([
-                back_button()
+                back_button(text=messages["back_button_text"], lang_code=lang_code) # # تمرير lang_code
             ])
         )
         context.user_data.pop("transfer_stage", None)
@@ -159,9 +165,9 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
 
     if amount <= 0:
         await update.message.reply_text(
-            "❌ المبلغ يجب أن يكون أكبر من صفر.",
+            messages["transfer_amount_must_be_positive"], # # استخدام النص المترجم
             reply_markup=create_reply_markup([
-                back_button()
+                back_button(text=messages["back_button_text"], lang_code=lang_code) # # تمرير lang_code
             ])
         )
         context.user_data.pop("transfer_stage", None)
@@ -169,15 +175,19 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
         logger.warning(f"المستخدم {user_id} حاول تحويل مبلغ غير موجب: {amount}.")
         return
 
-    balance = get_user_balance(user_id)
-    fee = round(amount * 0.01, 2)
+    balance = get_user_balance(user_id) # # هذه الدالة ستتغير لاحقاً
+    fee = round(amount * 0.01, 2) # # يمكن أن يكون 0.01 متغيرًا في config لاحقاً
     total_deduction = round(amount + fee, 2)
 
     if balance < total_deduction:
         await update.message.reply_text(
-            f"❌ رصيدك غير كافٍ لإتمام التحويل المطلوب.\nرصيدك الحالي: {balance} ر.س\nالمطلوب: {total_deduction} ر.س",
+            messages["insufficient_balance_for_transfer"].format(
+                current_balance=balance,
+                required_amount=total_deduction,
+                currency=messages["price_currency"]
+            ), # # استخدام النص المترجم
             parse_mode="HTML",
-            reply_markup=contact_admin_button()
+            reply_markup=contact_admin_button(lang_code) # # تمرير lang_code
         )
         context.user_data.pop("transfer_stage", None)
         context.user_data.pop("awaiting_input", None)
@@ -193,19 +203,19 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data["transfer_stage"] = "confirm_transfer"
 
     confirmation_message = (
-        f"🔁 <b>تأكيد تحويل الرصيد</b>\n\n"
-        f"✅ سيتم تحويل: <b>{amount} ر.س</b>\n"
-        f"👤 إلى معرف: <code>{target_id}</code>\n"
-        f"💸 عمولة التحويل: <b>{fee} ر.س</b>\n"
-        f"💰 إجمالي الخصم من رصيدك: <b>{total_deduction} ر.س</b>\n\n"
-        "⚠️ يرجى التأكد من صحة المعرف. لا يمكن التراجع عن هذه العملية."
+        messages["confirm_transfer_title"] + "\n\n" + # # استخدام النص المترجم
+        messages["transfer_amount_confirm"].format(amount=amount, currency=messages["price_currency"]) + "\n" + # # استخدام النص المترجم
+        messages["transfer_target_id_confirm"].format(target_id=target_id) + "\n" + # # استخدام النص المترجم
+        messages["transfer_fee_confirm"].format(fee=fee, currency=messages["price_currency"]) + "\n" + # # استخدام النص المترجم
+        messages["transfer_total_deduction_confirm"].format(total_deduction=total_deduction, currency=messages["price_currency"]) + "\n\n" + # # استخدام النص المترجم
+        messages["transfer_confirmation_warning"] # # استخدام النص المترجم
     )
     confirmation_keyboard = create_reply_markup([
         [
-            InlineKeyboardButton("✅ تأكيد التحويل", callback_data="confirm_transfer_yes"),
-            InlineKeyboardButton("❌ إلغاء", callback_data="confirm_transfer_no")
+            InlineKeyboardButton(messages["confirm_transfer_button"], callback_data="confirm_transfer_yes"), # # استخدام النص المترجم
+            InlineKeyboardButton(messages["cancel_button_text"], callback_data="confirm_transfer_no") # # استخدام النص المترجم
         ],
-        back_button()
+        back_button(text=messages["back_button_text"], lang_code=lang_code) # # تمرير lang_code
     ])
 
     await update.message.reply_text(
@@ -225,11 +235,14 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     logger.info(f"confirm_transfer: المستخدم {user_id} ضغط زر التأكيد: '{query.data}'. user_data: {context.user_data}")
 
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
+
     if context.user_data.get("transfer_stage") != "confirm_transfer":
         await query.edit_message_text(
-            "❌ انتهت صلاحية عملية التحويل أو تم إلغاؤها.",
+            messages["transfer_expired_or_cancelled"], # # استخدام النص المترجم
             reply_markup=create_reply_markup([
-                back_button()
+                back_button(text=messages["back_button_text"], lang_code=lang_code) # # تمرير lang_code
             ])
         )
         logger.warning(f"المستخدم {user_id} حاول تأكيد تحويل في مرحلة غير صحيحة.")
@@ -242,9 +255,9 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         details = context.user_data.get("transfer_details")
         if not details:
             await query.edit_message_text(
-                "❌ بيانات التحويل غير موجودة. يرجى البدء من جديد.",
+                messages["transfer_details_missing"], # # استخدام النص المترجم
                 reply_markup=create_reply_markup([
-                    back_button()
+                    back_button(text=messages["back_button_text"], lang_code=lang_code) # # تمرير lang_code
                 ])
             )
             logger.error(f"المستخدم {user_id} حاول تأكيد تحويل بدون تفاصيل. محتمل خطأ منطقي.")
@@ -257,12 +270,15 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         fee = details["fee"]
         total_deduction = details["total_deduction"]
 
-        current_balance = get_user_balance(user_id)
+        current_balance = get_user_balance(user_id) # # هذه الدالة ستتغير لاحقاً
         if current_balance < total_deduction:
             await query.edit_message_text(
-                f"❌ عذراً، رصيدك أصبح غير كافٍ ({current_balance} ر.س) لإتمام التحويل المطلوب ({total_deduction} ر.س).\n"
-                "يرجى شحن رصيدك أو التواصل مع الدعم.",
-                reply_markup=contact_admin_button()
+                messages["insufficient_balance_after_check"].format(
+                    current_balance=current_balance,
+                    required_amount=total_deduction,
+                    currency=messages["price_currency"]
+                ), # # استخدام النص المترجم
+                reply_markup=contact_admin_button(lang_code) # # تمرير lang_code
             )
             logger.warning(f"المستخدم {user_id} أكد التحويل لكن رصيده أصبح غير كافٍ. الحالي: {current_balance}.")
             context.user_data.pop("transfer_stage", None)
@@ -271,32 +287,36 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         try:
-            update_balance(user_id, -total_deduction)
-            update_balance(target_id, amount)
-            log_transfer(user_id, target_id, amount, fee)
+            update_balance(user_id, -total_deduction) # # هذه الدالة ستتغير لاحقاً
+            update_balance(target_id, amount) # # هذه الدالة ستتغير لاحقاً
+            log_transfer(user_id, target_id, amount, fee) # # هذه الدالة ستتغير لاحقاً
 
             await query.edit_message_text(
-                f"✅ تم تحويل <b>{amount} ر.س</b> إلى المستخدم <b>{target_id}</b>.\n"
-                f"💸 تم خصم عمولة <b>{fee} ر.س</b>.\n"
-                f"💰 رصيدك الجديد: <b>{get_user_balance(user_id)} ر.س</b>",
+                messages["transfer_successful_message"].format(
+                    amount=amount,
+                    currency=messages["price_currency"],
+                    target_id=target_id,
+                    fee=fee,
+                    new_balance=get_user_balance(user_id) # # هذه الدالة ستتغير لاحقاً
+                ), # # استخدام النص المترجم
                 parse_mode="HTML",
                 reply_markup=create_reply_markup([
-                    back_button()
+                    back_button(text=messages["back_button_text"], lang_code=lang_code) # # تمرير lang_code
                 ])
             )
             logger.info(f"المستخدم {user_id} أكد وحوّل {amount} إلى {target_id}. الرصيد الجديد: {get_user_balance(user_id)}.")
         except Exception as e:
             logger.error(f"خطأ أثناء تنفيذ تحويل الرصيد من {user_id} إلى {target_id} بمبلغ {amount} بعد التأكيد: {e}", exc_info=True)
             await query.edit_message_text(
-                "❌ حدث خطأ غير متوقع أثناء عملية التحويل بعد التأكيد. يرجى التواصل مع الدعم.",
-                reply_markup=contact_admin_button()
+                messages["transfer_unexpected_error"], # # استخدام النص المترجم
+                reply_markup=contact_admin_button(lang_code) # # تمرير lang_code
             )
 
     elif query.data == "confirm_transfer_no":
         await query.edit_message_text(
-            "❌ تم إلغاء عملية التحويل.",
+            messages["transfer_cancelled_message"], # # استخدام النص المترجم
             reply_markup=create_reply_markup([
-                back_button()
+                back_button(text=messages["back_button_text"], lang_code=lang_code) # # تمرير lang_code
             ])
         )
         logger.info(f"المستخدم {user_id} ألغى عملية التحويل.")
@@ -312,14 +332,17 @@ async def show_transfer_logs(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """
     user_id = update.effective_user.id
 
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
+
     if user_id not in ADMINS:
-        await update.callback_query.answer("❌ لا تملك صلاحية الوصول لهذا السجل.", show_alert=True)
+        await update.callback_query.answer(messages["no_permission_alert"], show_alert=True) # # استخدام النص المترجم
         return
 
-    data = load_json_file(TRANSFER_LOG_FILE, [])
+    data = load_json_file(TRANSFER_LOG_FILE, []) # # هذه الدالة ستتغير لاحقاً
 
     if not data:
-        await update.callback_query.message.edit_text("📭 لا يوجد أي تحويلات حتى الآن.")
+        await update.callback_query.message.edit_text(messages["no_transfers_yet"]) # # استخدام النص المترجم
         logger.info(f"المشرف {user_id} عرض سجل التحويلات، ولا يوجد أي تحويلات.")
         return
 
@@ -327,19 +350,23 @@ async def show_transfer_logs(update: Update, context: ContextTypes.DEFAULT_TYPE)
     lines = []
     for t in reversed(recent_transfers):
         lines.append(
-            f"🔁 <b>{t['from']}</b> ← <b>{t['to']}</b>\n"
-            f"💸 المبلغ: <b>{t['amount']} ر.س</b> | العمولة: <b>{t['fee']} ر.س</b>\n"
-            f"📅 التاريخ: {t['timestamp']}\n"
-            f"— — — — — —"
+            messages["transfer_log_entry"].format(
+                sender_id=t['from'],
+                receiver_id=t['to'],
+                amount=t['amount'],
+                currency=messages["price_currency"],
+                fee=t['fee'],
+                date=t['timestamp']
+            )
         )
 
-    message = "<b>📊 آخر التحويلات بين المستخدمين:</b>\n\n" + "\n".join(lines)
+    message = messages["recent_transfers_title"] + "\n\n" + "\n".join(lines) # # استخدام النص المترجم
     await update.callback_query.message.edit_text(
         message,
         parse_mode="HTML",
         reply_markup=create_reply_markup([
-            back_button(text="🔙 العودة"),
-            [InlineKeyboardButton("🗑️ حذف الكل", callback_data="confirm_clear_transfers")]
+            back_button(text=messages["back_button_text"], lang_code=lang_code), # # استخدام النص المترجم
+            [InlineKeyboardButton(messages["clear_all_transfers_button"], callback_data="confirm_clear_transfers")] # # استخدام النص المترجم
         ])
     )
     logger.info(f"المشرف {user_id} عرض آخر {len(recent_transfers)} تحويلات.")
@@ -350,18 +377,21 @@ async def confirm_clear_transfers(update: Update, context: ContextTypes.DEFAULT_
     يطلب تأكيد من المشرف قبل حذف جميع سجلات التحويلات.
     """
     user_id = update.effective_user.id
+
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
+
     if user_id not in ADMINS:
-        await update.callback_query.answer("❌ غير مصرح لك.", show_alert=True)
+        await update.callback_query.answer(messages["unauthorized_alert"], show_alert=True) # # استخدام النص المترجم
         logger.warning(f"المستخدم {user_id} حاول تأكيد حذف التحويلات بدون صلاحية.")
         return
 
     await update.callback_query.message.edit_text(
-        "⚠️ هل أنت متأكد من حذف جميع سجل التحويلات؟ لا يمكن التراجع.\n\n"
-        "اضغط للتأكيد:",
+        messages["confirm_clear_transfers_message"], # # استخدام النص المترجم
         reply_markup=create_reply_markup([
             [
-                InlineKeyboardButton("✅ نعم، احذف", callback_data="clear_transfers"),
-                InlineKeyboardButton("❌ إلغاء", callback_data="back_to_dashboard")
+                InlineKeyboardButton(messages["yes_delete_button"], callback_data="clear_transfers"), # # استخدام النص المترجم
+                InlineKeyboardButton(messages["cancel_button_text"], callback_data="back_to_dashboard") # # استخدام النص المترجم
             ]
         ]),
         parse_mode="HTML"
@@ -374,11 +404,15 @@ async def clear_all_transfers(update: Update, context: ContextTypes.DEFAULT_TYPE
     ينفذ حذف جميع سجلات التحويلات بعد تأكيد المشرف.
     """
     user_id = update.effective_user.id
+
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
+
     if user_id not in ADMINS:
-        await update.callback_query.answer("❌ غير مصرح لك.", show_alert=True)
+        await update.callback_query.answer(messages["unauthorized_alert"], show_alert=True) # # استخدام النص المترجم
         logger.warning(f"المستخدم {user_id} حاول حذف جميع التحويلات بدون صلاحية.")
         return
 
-    save_json_file(TRANSFER_LOG_FILE, [])
-    await update.callback_query.message.edit_text("✅ تم حذف جميع سجل التحويلات.")
+    save_json_file(TRANSFER_LOG_FILE, []) # # هذه الدالة ستتغير لاحقاً
+    await update.callback_query.message.edit_text(messages["transfers_cleared_success"]) # # استخدام النص المترجم
     logger.info(f"المشرف {user_id} قام بحذف جميع سجلات التحويلات.")

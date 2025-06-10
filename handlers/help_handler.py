@@ -1,7 +1,10 @@
 # handlers/help_handler.py
+
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 from keyboards.utils_kb import back_button, create_reply_markup
+from utils.i18n import get_messages # # تم إضافة هذا السطر لاستيراد دالة جلب النصوص
+from config import DEFAULT_LANGUAGE # # تم إضافة هذا السطر لاستيراد اللغة الافتراضية
 
 async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -10,12 +13,15 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    message = "🌹 مرحباً Dr\\Ramzi 😊\n⌁─━─━ (FakeDigits) ─━─━⌁"
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
+
+    message = messages["help_menu_welcome_message"].format(bot_name="FakeDigits") # # استخدام النص المترجم
     keyboard = create_reply_markup([
-        [InlineKeyboardButton("📩 - التواصل مع الدعم", callback_data="contact_support")],
-        [InlineKeyboardButton("📄 - شرح الاستخدام", callback_data="usage_guide")],
-        [InlineKeyboardButton("❓ - الأسئلة الشائعة", callback_data="faq")],
-        back_button(text="🔙 عودة")
+        [InlineKeyboardButton(messages["contact_support_button"], callback_data="contact_support")], # # استخدام النص المترجم
+        [InlineKeyboardButton(messages["usage_guide_button"], callback_data="usage_guide")], # # استخدام النص المترجم
+        [InlineKeyboardButton(messages["faq_button"], callback_data="faq")], # # استخدام النص المترجم
+        back_button(text=messages["back_button_text"], lang_code=lang_code) # # استخدام النص المترجم لزر العودة
     ])
 
     await query.message.edit_text(message, reply_markup=keyboard)
@@ -28,23 +34,26 @@ async def handle_usage_guide(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer()
 
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
+
     message = (
-        "📘 <b>شرح استخدام البوت</b>\n\n"
-        "1️⃣ اضغط على زر 💎 شراء رقم في القائمة الرئيسية.\n"
-        "2️⃣ اختر المنصة التي ترغب بتفعيل الرقم فيها (واتساب، تليجرام...)\n"
-        "3️⃣ اختر الدولة ثم السيرفر المناسب حسب السعر والجودة.\n"
-        "4️⃣ سيتم خصم الرصيد تلقائيًا وعرض الرقم لك.\n"
-        "5️⃣ تابع الكود الذي يصلك مباشرة داخل البوت.\n\n"
-        "📌 ملاحظات:\n"
-        "- تأكد من شحن رصيدك قبل الشراء.\n"
-        "- الأسعار تختلف حسب السيرفر والدولة.\n"
-        "- بعض الأرقام صالحة لفترة محدودة.\n\n"
-        "⚠️ في حال واجهتك مشكلة تواصل مع الدعم.\n"
-        "🔙 يمكنك العودة من الزر التالي."
+        messages["usage_guide_title"] + "\n\n" + # # استخدام النص المترجم
+        messages["usage_step_1"] + "\n" + # # استخدام النص المترجم
+        messages["usage_step_2"] + "\n" + # # استخدام النص المترجم
+        messages["usage_step_3"] + "\n" + # # استخدام النص المترجم
+        messages["usage_step_4"] + "\n" + # # استخدام النص المترجم
+        messages["usage_step_5"] + "\n\n" + # # استخدام النص المترجم
+        messages["usage_notes_title"] + "\n" + # # استخدام النص المترجم
+        messages["usage_note_1"] + "\n" + # # استخدام النص المترجم
+        messages["usage_note_2"] + "\n" + # # استخدام النص المترجم
+        messages["usage_note_3"] + "\n\n" + # # استخدام النص المترجم
+        messages["usage_problem_contact_support"] + "\n" + # # استخدام النص المترجم
+        messages["back_to_menu_note"] # # استخدام النص المترجم
     )
 
     keyboard = create_reply_markup([
-        back_button(callback_data="help", text="🔙 العودة")
+        back_button(callback_data="help", text=messages["back_button_text"], lang_code=lang_code) # # استخدام النص المترجم لزر العودة
     ])
 
     await query.message.edit_text(message, reply_markup=keyboard, parse_mode="HTML")
@@ -56,16 +65,19 @@ async def handle_contact_support(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     await query.answer()
 
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
+
     message = (
-        "📞 <b>التواصل مع الدعم</b>\n\n"
-        "لأي استفسار أو مشكلة:\n"
-        "🔗 <a href='https://t.me/DrRamzi0'>@DrRamzi0</a>\n\n"
-        "🕐 متاح من الساعة 10 صباحًا حتى 12 منتصف الليل.\n"
-        "📌 أرسل استفسارك مع صورة/شرح إن وُجد."
+        messages["contact_support_title"] + "\n\n" + # # استخدام النص المترجم
+        messages["contact_support_prompt"] + "\n" + # # استخدام النص المترجم
+        messages["contact_support_link"].format(support_link="https://t.me/DrRamzi0") + "\n\n" + # # استخدام النص المترجم
+        messages["contact_support_hours"] + "\n" + # # استخدام النص المترجم
+        messages["contact_support_tip"] # # استخدام النص المترجم
     )
 
     keyboard = create_reply_markup([
-        back_button(callback_data="help", text="🔙 العودة")
+        back_button(callback_data="help", text=messages["back_button_text"], lang_code=lang_code) # # استخدام النص المترجم لزر العودة
     ])
 
     await query.message.edit_text(message, reply_markup=keyboard, parse_mode="HTML")
@@ -77,19 +89,19 @@ async def handle_faq(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
+
     message = (
-        "❓ <b>الأسئلة الشائعة</b>\n\n"
-        "🟢 <b>هل الرقم يُستخدم مرة واحدة؟</b>\n"
-        "نعم، كل رقم يُستخدم لتفعيل حساب واحد فقط.\n\n"
-        "🟢 <b>ماذا لو لم يصلني الكود؟</b>\n"
-        "حاول مرة أخرى أو استخدم سيرفر مختلف.\n\n"
-        "🟢 <b>هل يمكن استرجاع الرصيد؟</b>\n"
-        "فقط في حال فشل العملية ولم يُستخدم الرقم.\n\n"
-        "📩 لمزيد من الأسئلة تواصل مع الدعم."
+        messages["faq_title"] + "\n\n" + # # استخدام النص المترجم
+        messages["faq_q1"] + "\n" + messages["faq_a1"] + "\n\n" + # # استخدام النصوص المترجمة
+        messages["faq_q2"] + "\n" + messages["faq_a2"] + "\n\n" + # # استخدام النصوص المترجمة
+        messages["faq_q3"] + "\n" + messages["faq_a3"] + "\n\n" + # # استخدام النصوص المترجمة
+        messages["faq_more_questions"] # # استخدام النص المترجم
     )
 
     keyboard = create_reply_markup([
-        back_button(callback_data="help", text="🔙 العودة")
+        back_button(callback_data="help", text=messages["back_button_text"], lang_code=lang_code) # # استخدام النص المترجم لزر العودة
     ])
 
     await query.message.edit_text(message, reply_markup=keyboard, parse_mode="HTML")
