@@ -1,35 +1,48 @@
 # handlers/category_handler.py
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
-from keyboards.server_kb import load_servers, server_keyboard, load_all_servers_data, save_servers_data # # load_servers/save_servers_data ستتغير مع DB
-from utils.balance import get_user_balance, update_balance # # هذه الدوال ستتغير مع DB
-import json
-import os
-import random
 import logging
-from datetime import datetime
-from keyboards.category_kb import category_inline_keyboard
-from keyboards.utils_kb import back_button, create_reply_markup
-from utils.data_manager import load_json_file, save_json_file # # load_json_file/save_json_file ستتغير مع DB
-from utils.i18n import get_messages
-from config import DEFAULT_LANGUAGE
-from utils.helpers import get_flag # # تم تعديل هذا السطر لاستيراد get_flag من utils.helpers
+import os
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import ContextTypes
 
+from utils.i18n import get_messages
+from utils.data_manager import (
+    load_json_file, save_json_file,
+)
+from keyboards.utils_kb import back_button, create_reply_markup
+from utils.balance import get_user_balance, update_balance
+from utils.helpers import get_flag
+from config import DEFAULT_LANGUAGE
+
+from keyboards.category_kb import category_inline_keyboard
+from keyboards.countries_kb import countries_keyboard
+from services.user_service import ensure_user_exists # <-- تم التعديل هنا: استيراد ensure_user_exists من services.user_service
+
+import random
+from datetime import datetime
+
+# Logger setup
 logger = logging.getLogger(__name__)
 
-PURCHASES_FILE = os.path.join("data", "purchases.json") # # هذا المسار سيتغير لاحقاً مع DB
-SERVERS_FILE = os.path.join("data", "servers.json") # # هذا المسار سيتغير لاحقاً مع DB
+# Constants for callback data
+SELECT_COUNTRY = "select_country"
+SELECT_SERVER = "select_server"
+SELECT_PLATFORM = "select_platform"
+BUY_NUMBER = "buy_number"
+REQUEST_CODE = "request_code"
+CANCEL_NUMBER = "cancel_number"
+BACK_TO_MAIN_MENU = "back_to_main_menu"
+BACK_TO_CATEGORIES = "back_to_categories"
+
+
+PURCHASES_FILE = os.path.join("data", "purchases.json")
+SERVERS_FILE = os.path.join("data", "servers.json")
 
 PLATFORMS = ["WhatsApp", "Telegram", "Snapchat", "Instagram", "Facebook", "TikTok"]
 
 async def handle_platform_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    يعالج النقر على أزرار اختيار المنصة (مثل WhatsApp, Telegram).
-    يوجه المستخدم لاختيار نوع الرقم (عربي، عشوائي، إلخ).
-    """
     query = update.callback_query
-    await query.answer()
+    await query.answer(text=get_messages(context.user_data.get("lang_code", DEFAULT_LANGUAGE)).get("fetching_data", "جارٍ جلب البيانات..."), show_alert=False)
     data = query.data
     
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
@@ -44,14 +57,8 @@ async def handle_platform_buttons(update: Update, context: ContextTypes.DEFAULT_
         )
 
 async def handle_category_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    يعالج اختيار المنطقة (مثل العرب، آسيا، أفريقيا) لشراء الأرقام.
-    يعرض قائمة الدول المتاحة في تلك المنطقة.
-    """
-    # # تم تعديل هذا الاستيراد ليشير إلى الدالة الموحدة
-    from keyboards.countries_kb import countries_keyboard
     query = update.callback_query
-    await query.answer()
+    await query.answer(text=get_messages(context.user_data.get("lang_code", DEFAULT_LANGUAGE)).get("fetching_data", "جارٍ جلب البيانات..."), show_alert=False)
     data = query.data
     
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
@@ -67,20 +74,19 @@ async def handle_category_selection(update: Update, context: ContextTypes.DEFAUL
         )
 
 async def handle_country_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    يعالج اختيار الدولة لشراء الأرقام.
-    يعرض السيرفرات المتاحة لهذه الدولة مع أسعارها وكمياتها.
-    """
     query = update.callback_query
-    await query.answer()
-    _, country_code, platform = query.data.split("_")
-    user_id = update.effective_user.id
-    balance = get_user_balance(user_id) # # هذه الدالة ستتغير لاحقاً
-
+    user = update.effective_user
+    user_id = user.id
+    
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
     messages = get_messages(lang_code)
-    
-    all_servers_data = load_json_file(SERVERS_FILE, []) # # هذه الدالة ستتغير لاحقاً
+
+    await query.answer(text=messages.get("fetching_data", "جارٍ جلب البيانات..."), show_alert=False)
+
+    _, country_code, platform = query.data.split("_")
+    balance = get_user_balance(user_id, user.to_dict()) 
+
+    all_servers_data = load_json_file(SERVERS_FILE, [])
     country_entry = next((entry for entry in all_servers_data if entry["platform"] == platform and entry["country"] == country_code), None)
 
     available_servers_for_display = []
@@ -90,24 +96,35 @@ async def handle_country_selection(update: Update, context: ContextTypes.DEFAULT
                 available_servers_for_display.append(s)
 
     if not available_servers_for_display:
-        await query.message.edit_text(messages["no_servers_available"])
+        await query.message.edit_text(
+            messages["no_servers_available_for_country"],
+            reply_markup=create_reply_markup([
+                back_button(text=messages["back_button_text"], callback_data=f"select_app_{platform}", lang_code=lang_code)
+            ])
+        )
         logger.info(f"المستخدم {user_id} حاول اختيار دولة {country_code} لمنصة {platform} ولا توجد سيرفرات متاحة.")
         return
 
-    # # يمكن تحسين هذا الجزء باستخدام المفاتيح المناسبة من `messages`
-    if balance < min(s['price'] for s in available_servers_for_display):
+    min_price_in_country = min(s['price'] for s in available_servers_for_display)
+
+    if balance < min_price_in_country:
         await query.message.edit_text(
-            messages["insufficient_balance_for_country"].format(balance=balance, currency=messages["price_currency"]),
+            messages["balance_insufficient"].format(
+                balance=balance, currency=messages["price_currency"]
+            ),
+            reply_markup=create_reply_markup([
+                [InlineKeyboardButton(messages["recharge_balance_button"], callback_data="recharge")],
+                back_button(text=messages["back_button_text"], callback_data=f"select_app_{platform}", lang_code=lang_code)
+            ]),
             parse_mode="HTML"
         )
-        logger.info(f"المستخدم {user_id} لديه رصيد غير كافٍ ({balance}) لشراء من {country_code} لـ {platform}.")
+        logger.info(f"المستخدم {user_id} لديه رصيد غير كافٍ ({balance}) لشراء أي سيرفر في {country_code} لـ {platform}. أقل سعر: {min_price_in_country}.")
         return
 
     buttons = []
     for s in available_servers_for_display:
-        # # استخدام النص المترجم لـ "server_button_label" كما في server_kb
         label = messages["server_button_label"].format(
-            emoji="✨", # # يمكن اختيار ايموجي مختلف أو جعله ديناميكي
+            emoji="✨",
             server_name=s['name'],
             price=s['price'],
             currency=messages["price_currency"],
@@ -134,26 +151,26 @@ async def handle_country_selection(update: Update, context: ContextTypes.DEFAULT
     logger.info(f"المستخدم {user_id} يعرض سيرفرات {country_code} لـ {platform}. رصيده: {balance}.")
 
 async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    يعالج عملية الشراء الوهمية للرقم.
-    يخصم الرصيد، يقلل الكمية، ويُنشئ سجل شراء مؤقت.
-    """
     query = update.callback_query
-    await query.answer()
-    user_id = update.effective_user.id
+    user = update.effective_user
+    user_id = user.id
 
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
     messages = get_messages(lang_code)
+
+    await query.answer(text=messages.get("processing_request", "جارٍ معالجة طلبك..."), show_alert=False)
 
     try:
         _, platform, country_code, server_id_str = query.data.split("_")
         server_id = int(server_id_str)
     except ValueError:
         logger.error(f"خطأ في تحليل بيانات الكولباك للشراء الوهمي: {query.data}", exc_info=True)
-        await query.message.edit_text(messages["error_processing_request"])
+        await query.message.edit_text(messages["error_processing_request_user"])
         return
 
-    all_servers_data = load_json_file(SERVERS_FILE, []) # # هذه الدالة ستتغير لاحقاً
+    current_balance = get_user_balance(user_id, user.to_dict())
+
+    all_servers_data = load_json_file(SERVERS_FILE, [])
     selected_server_entry = None
     for entry in all_servers_data:
         if entry["platform"] == platform and entry["country"] == country_code:
@@ -171,18 +188,10 @@ async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYP
 
     current_quantity = selected.get("quantity", 0)
     price = selected.get("price", 0)
-    user_balance = get_user_balance(user_id) # # هذه الدالة ستتغير لاحقاً
-
+    
     if current_quantity <= 0:
         await query.message.edit_text(
-            messages["no_numbers_available_server"].format(
-                server_name=selected['name'],
-                platform=platform,
-                country_code=country_code.upper(), # # يمكن جلب اسم الدولة المترجم هنا
-                balance=user_balance,
-                currency=messages["price_currency"]
-            ),
-            parse_mode="HTML",
+            messages.get("no_numbers_available_in_server", "عذراً، لا توجد أرقام متاحة في السيرفر المختار حالياً. يرجى اختيار سيرفر آخر أو دولة أخرى."),
             reply_markup=create_reply_markup([
                 back_button(text=messages["back_to_country_server_selection_button"], callback_data=f"country_{country_code}_{platform}", lang_code=lang_code)
             ])
@@ -190,11 +199,10 @@ async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYP
         logger.info(f"المستخدم {user_id} حاول شراء سيرفر بكمية 0: {platform}-{country_code}-{server_id}.")
         return
 
-    if user_balance < price:
+    if current_balance < price:
         await query.message.edit_text(
-            messages["insufficient_balance_recharge_prompt"].format(
-                current_balance=user_balance,
-                price=price,
+            messages["balance_insufficient"].format(
+                balance=current_balance,
                 currency=messages["price_currency"]
             ),
             reply_markup=create_reply_markup([
@@ -203,19 +211,20 @@ async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYP
             ]),
             parse_mode="HTML"
         )
-        logger.info(f"المستخدم {user_id} لديه رصيد غير كافٍ ({user_balance}) لشراء سيرفر {platform}-{country_code}-{server_id} بسعر {price}.")
+        logger.info(f"المستخدم {user_id} لديه رصيد غير كافٍ ({current_balance}) لشراء سيرفر {platform}-{country_code}-{server_id} بسعر {price}.")
         return
 
+    fake_number = f"9665{random.randint(10000000, 99999999)}"
+    
+    update_balance(user_id, -price, user.to_dict())
+
     selected["quantity"] -= 1
-    save_servers_data(all_servers_data) # # هذه الدالة ستتغير لاحقاً
+    from keyboards.server_kb import save_servers_data
+    save_servers_data(all_servers_data)
 
-    update_balance(user_id, -price) # # هذه الدالة ستتغير لاحقاً
-
-    purchases = load_json_file(PURCHASES_FILE, {}) # # هذه الدالة ستتغير لاحقاً
+    purchases = load_json_file(PURCHASES_FILE, {})
 
     user_purchases = purchases.get(str(user_id), [])
-    fake_number = f"9665{random.randint(10000000, 99999999)}"
-
     purchase_record = {
         "platform": platform,
         "country": country_code,
@@ -229,7 +238,7 @@ async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYP
     user_purchases.append(purchase_record)
     purchases[str(user_id)] = user_purchases
 
-    save_json_file(PURCHASES_FILE, purchases) # # هذه الدالة ستتغير لاحقاً
+    save_json_file(PURCHASES_FILE, purchases)
 
     buttons = create_reply_markup([
         [InlineKeyboardButton(messages["request_code_button"], callback_data=f"get_code_{fake_number}_{server_id}")],
@@ -240,38 +249,40 @@ async def handle_fake_purchase(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.message.edit_text(
         messages["purchase_success_message"].format(
             platform=platform,
-            country=country_code.upper(), # # يمكن جلب اسم الدولة المترجم هنا
+            country=get_messages(lang_code).get(f"country_name_{country_code}", country_code.upper()),
             server_name=selected['name'],
             price=price,
             currency=messages["price_currency"],
             fake_number=fake_number
         ) + "\n\n" + messages["waiting_for_code_message"] + "\n" +
-        messages["current_balance_info"].format(balance=get_user_balance(user_id), currency=messages["price_currency"]),
-        parse_mode="HTML",
+        messages["current_balance_info"].format(balance=get_user_balance(user_id, user.to_dict()), currency=messages["price_currency"]),
+        parse_mode='HTML',
         reply_markup=buttons
     )
     logger.info(f"المستخدم {user_id} اشترى رقماً وهمياً: {fake_number} من سيرفر {selected['name']} بسعر {price}. الكمية المتبقية: {selected['quantity']}.")
 
-async def handle_random_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    يعالج اختيار دولة عشوائية لشراء الأرقام.
-    يعرض السيرفرات المتاحة في الدولة المختارة عشوائياً.
-    """
-    query = update.callback_query
-    await query.answer()
-    platform = query.data.replace("random_", "")
-    user_id = query.from_user.id
-    balance = get_user_balance(user_id) # # هذه الدالة ستتغير لاحقاً
 
+async def handle_random_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user = update.effective_user
+    user_id = user.id
+    
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
     messages = get_messages(lang_code)
 
-    all_data = load_json_file(SERVERS_FILE, []) # # هذه الدالة ستتغير لاحقاً
-    candidates = [
-        s for s in all_data
-        if s["platform"] == platform and
-            any(server.get("quantity", 0) > 0 for server in s.get("servers", []))
-    ]
+    await query.answer(text=messages.get("fetching_data", "جارٍ جلب البيانات..."), show_alert=False)
+    
+    platform = query.data.replace("random_", "")
+    balance = get_user_balance(user_id, user.to_dict())
+
+    all_data = load_json_file(SERVERS_FILE, [])
+    # # إعادة صياغة هذا الجزء لتجنب أي مشاكل في النطاق مع المتغير 'platform'
+    candidates = []
+    for s_entry in all_data:
+        if s_entry["platform"] == platform:
+            if any(server.get("quantity", 0) > 0 for server in s_entry.get("servers", [])):
+                candidates.append(s_entry)
+                
     if not candidates:
         await query.message.edit_text(messages["no_numbers_available_platform"])
         logger.info(f"المستخدم {user_id} حاول اختيار دولة عشوائية لـ {platform} ولا توجد أرقام متوفرة.")
@@ -285,20 +296,33 @@ async def handle_random_country(update: Update, context: ContextTypes.DEFAULT_TY
     available_servers_in_country = [s for s in selected_country_entry["servers"] if s.get("quantity", 0) > 0]
 
     if not available_servers_in_country:
-        await query.message.edit_text(messages["no_numbers_available_random_country"])
+        await query.message.edit_text(
+            messages["no_numbers_available_random_country"],
+            reply_markup=create_reply_markup([
+                back_button(text=messages["back_button_text"], callback_data=f"select_app_{platform}", lang_code=lang_code)
+            ])
+        )
         logger.warning(f"المستخدم {user_id} اختار دولة عشوائية {country_code} لـ {platform} ولكن لا يوجد سيرفرات متاحة فيها.")
         return
 
-    if balance < min(s['price'] for s in available_servers_in_country):
-        await query.message.edit_text(messages["insufficient_balance_for_country"].format(balance=balance, currency=messages["price_currency"]))
-        logger.info(f"المستخدم {user_id} لديه رصيد غير كافٍ ({balance}) لشراء من الدولة العشوائية {country_code} لـ {platform}.")
+    min_price_in_random_country = min(s['price'] for s in available_servers_in_country)
+
+    if balance < min_price_in_random_country:
+        await query.message.edit_text(
+            messages["balance_insufficient"].format(balance=balance, currency=messages["price_currency"]),
+            reply_markup=create_reply_markup([
+                [InlineKeyboardButton(messages["recharge_balance_button"], callback_data="recharge")],
+                back_button(text=messages["back_button_text"], callback_data=f"select_app_{platform}", lang_code=lang_code)
+            ]),
+            parse_mode="HTML"
+        )
+        logger.info(f"المستخدم {user_id} لديه رصيد غير كافٍ ({balance}) لشراء من الدولة العشوائية {country_code} لـ {platform}. أقل سعر: {min_price_in_random_country}.")
         return
 
     buttons = []
     for s in available_servers_in_country:
-        # # استخدام النص المترجم لـ "server_button_label"
         label = messages["server_button_label"].format(
-            emoji="✨", # # يمكن اختيار ايموجي مختلف أو جعله ديناميكي
+            emoji="✨",
             server_name=s['name'],
             price=s['price'],
             currency=messages["price_currency"],
@@ -321,17 +345,17 @@ async def handle_random_country(update: Update, context: ContextTypes.DEFAULT_TY
     logger.info(f"المستخدم {user_id} يعرض سيرفرات الدولة العشوائية {country_code} لـ {platform}.")
 
 async def handle_most_available_countries(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    يعالج عرض الدول التي تحتوي على أكثر عدد من الأرقام المتاحة لمنصة معينة.
-    """
     query = update.callback_query
-    await query.answer()
+    lang_code_for_answer = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages_for_answer = get_messages(lang_code_for_answer)
+    await query.answer(text=messages_for_answer.get("fetching_data", "جارٍ جلب البيانات..."), show_alert=False)
+    
     platform = query.data.replace("most_", "")
 
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
     messages = get_messages(lang_code)
 
-    all_data = load_json_file(SERVERS_FILE, []) # # هذه الدالة ستتغير لاحقاً
+    all_data = load_json_file(SERVERS_FILE, [])
 
     countries_with_availability = set()
     for entry in all_data:
@@ -360,9 +384,6 @@ async def handle_most_available_countries(update: Update, context: ContextTypes.
     logger.info(f"تم عرض الدول الأكثر توفراً لـ {platform}.")
 
 async def handle_platform_selection_by_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    يعالج اختيار المنصة يدوياً عن طريق إرسال اسمها كنص (بدلاً من زر).
-    """
     text = update.message.text.strip().lower()
     
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
@@ -375,10 +396,8 @@ async def handle_platform_selection_by_text(update: Update, context: ContextType
         "instagram": "Instagram",
         "facebook": "Facebook",
         "tiktok": "TikTok",
-        # # إضافة ترجمات للأسماء العربية أو الإنجليزية إذا كان المستخدم سيكتبها
         messages.get("platform_whatsapp_text_input_key", "واتساب").lower(): "WhatsApp",
         messages.get("platform_telegram_text_input_key", "تليجرام").lower(): "Telegram",
-        # ... وهكذا لبقية المنصات ...
     }
     platform = mapping.get(text)
     if not platform:
@@ -391,27 +410,16 @@ async def handle_platform_selection_by_text(update: Update, context: ContextType
         reply_markup=category_inline_keyboard(platform, lang_code)
     )
 
-# # تم حذف هذه الدالة لأن get_flag أصبحت في utils.helpers
-# def get_flag(country_code):
-#     """
-#     يحول رمز كود الدولة (مثل 'sa') إلى علم الدولة (مثل '🇸🇦').
-#     """
-#     try:
-#         return ''.join([chr(127397 + ord(c.upper())) for c in country_code])
-#     except:
-#         return "🏳️"
-
 async def show_available_platforms(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    يعرض قائمة بالمنصات المتاحة حالياً مع عدد الدول المتوفرة لكل منها.
-    """
     query = update.callback_query
-    await query.answer()
-
+    lang_code_for_answer = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages_for_answer = get_messages(lang_code_for_answer)
+    await query.answer(text=messages_for_answer.get("fetching_data", "جارٍ جلب البيانات..."), show_alert=False)
+    
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
     messages = get_messages(lang_code)
 
-    all_data = load_json_file(SERVERS_FILE, []) # # هذه الدالة ستتغير لاحقاً
+    all_data = load_json_file(SERVERS_FILE, [])
 
     platforms_with_availability = {}
     for entry in all_data:
@@ -428,10 +436,8 @@ async def show_available_platforms(update: Update, context: ContextTypes.DEFAULT
         return
 
     buttons = []
-    # # تم تعديل هذا الاستيراد ليشير إلى الدالة الموحدة
-    # # from keyboards.countries_kb import get_flag as get_country_flag
     for platform_name, countries in platforms_with_availability.items():
-        flag_line = " ".join(get_flag(code) for code in sorted(countries)) # # استخدام get_flag الموحدة
+        flag_line = " ".join(get_flag(code) for code in sorted(list(countries)))
         buttons.append([
             InlineKeyboardButton(messages["platform_country_count"].format(platform=platform_name, count=len(countries)), callback_data=f"select_app_{platform_name}")
         ])
@@ -449,20 +455,18 @@ async def show_available_platforms(update: Update, context: ContextTypes.DEFAULT
     logger.info("تم عرض المنصات المتاحة حاليا.")
 
 async def show_ready_numbers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    يعرض قائمة بالأرقام الفورية الجاهزة للشراء عبر مختلف المنصات والدول.
-    """
-    # # تم تعديل هذا الاستيراد ليشير إلى الدالة الموحدة
-    # # from keyboards.countries_kb import get_flag
     query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    balance = get_user_balance(user_id) # # هذه الدالة ستتغير لاحقاً
-
+    user = update.effective_user
+    user_id = user.id
+    
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
     messages = get_messages(lang_code)
 
-    all_data = load_json_file(SERVERS_FILE, []) # # هذه الدالة ستتغير لاحقاً
+    await query.answer(text=messages.get("fetching_data", "جارٍ جلب البيانات..."), show_alert=False)
+    
+    balance = get_user_balance(user_id, user.to_dict())
+
+    all_data = load_json_file(SERVERS_FILE, [])
 
     ready_numbers = []
     for item in all_data:
@@ -479,7 +483,7 @@ async def show_ready_numbers(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 "platform": platform,
                 "country": country_code,
                 "country_name": country_name,
-                "flag": get_flag(country_code), # # استخدام get_flag الموحدة
+                "flag": get_flag(country_code),
                 "server": cheapest
             })
 
@@ -491,7 +495,21 @@ async def show_ready_numbers(update: Update, context: ContextTypes.DEFAULT_TYPE)
         logger.info("لا توجد أرقام فورية جاهزة لعرضها.")
         return
 
-    for item in ready_numbers[:10]: # # عرض أول 10 فقط
+    min_price_in_ready_numbers = min(item['server']['price'] for item in ready_numbers)
+
+    if balance < min_price_in_ready_numbers:
+        await query.message.edit_text(
+            messages["balance_insufficient"].format(balance=balance, currency=messages["price_currency"]),
+            reply_markup=create_reply_markup([
+                [InlineKeyboardButton(messages["recharge_balance_button"], callback_data="recharge")],
+                back_button(text=messages["back_button_text"], lang_code=lang_code)
+            ]),
+            parse_mode="HTML"
+        )
+        logger.info(f"المستخدم {user_id} لديه رصيد غير كافٍ ({balance}) لشراء أي رقم فوري. أقل سعر: {min_price_in_ready_numbers}.")
+        return
+
+    for item in ready_numbers[:10]:
         btn_text = messages["ready_number_button_label"].format(
             flag=item['flag'],
             country_name=item['country_name'],
@@ -514,26 +532,24 @@ async def show_ready_numbers(update: Update, context: ContextTypes.DEFAULT_TYPE)
     logger.info(f"تم عرض {len(ready_numbers[:10])} أرقام فورية جاهزة للمستخدم {user_id}.")
 
 async def get_fake_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    يعالج طلب الحصول على الكود الوهمي لرقم تم شراؤه.
-    يُرسل كوداً وهمياً ويُحدث حالة الرقم إلى 'active'.
-    """
     query = update.callback_query
-    await query.answer()
-    user_id = update.effective_user.id
-
+    user = update.effective_user
+    user_id = user.id
+    
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
     messages = get_messages(lang_code)
 
+    await query.answer(text=messages.get("processing_request", "جارٍ معالجة طلبك..."), show_alert=False)
+    
     try:
         _, _, fake_number, server_id_str = query.data.split("_")
         server_id = int(server_id_str)
     except ValueError:
         logger.error(f"خطأ في تحليل بيانات الكولباك لطلب الكود الوهمي: {query.data}", exc_info=True)
-        await query.message.edit_text(messages["error_processing_request"])
+        await query.message.edit_text(messages["error_processing_request_user"])
         return
 
-    purchases = load_json_file(PURCHASES_FILE, {}) # # هذه الدالة ستتغير لاحقاً
+    purchases = load_json_file(PURCHASES_FILE, {})
 
     user_purchases = purchases.get(str(user_id), [])
     target_purchase = None
@@ -564,7 +580,7 @@ async def get_fake_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     purchases[str(user_id)] = user_purchases
 
-    save_json_file(PURCHASES_FILE, purchases) # # هذه الدالة ستتغير لاحقاً
+    save_json_file(PURCHASES_FILE, purchases)
 
     await query.message.edit_text(
         messages["code_sent_success"].format(fake_number=fake_number, fake_code=fake_code) + "\n\n" +
@@ -578,26 +594,24 @@ async def get_fake_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cancel_fake_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    يعالج إلغاء الرقم الوهمي واسترداد الرصيد.
-    يُحدث حالة الرقم إلى 'cancelled' ويُعيد الرصيد للمستخدم.
-    """
     query = update.callback_query
-    await query.answer()
-    user_id = update.effective_user.id
-
+    user = update.effective_user
+    user_id = user.id
+    
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
     messages = get_messages(lang_code)
 
+    await query.answer(text=messages.get("processing_request", "جارٍ معالجة طلبك..."), show_alert=False)
+    
     try:
         _, _, fake_number, server_id_str = query.data.split("_")
         server_id = int(server_id_str)
     except ValueError:
         logger.error(f"خطأ في تحليل بيانات الكولباك لإلغاء الرقم الوهمي: {query.data}", exc_info=True)
-        await query.message.edit_text(messages["error_processing_request"])
+        await query.message.edit_text(messages["error_processing_request_user"])
         return
 
-    purchases = load_json_file(PURCHASES_FILE, {}) # # هذه الدالة ستتغير لاحقاً
+    purchases = load_json_file(PURCHASES_FILE, {})
 
     user_purchases = purchases.get(str(user_id), [])
     target_purchase_index = -1
@@ -625,14 +639,15 @@ async def cancel_fake_number(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     price = target_purchase.get("price", 0)
-    update_balance(user_id, price) # # هذه الدالة ستتغير لاحقاً
+    update_balance(user_id, price, user.to_dict())
 
     user_purchases[target_purchase_index]["status"] = "cancelled"
     purchases[str(user_id)] = user_purchases
 
-    save_json_file(PURCHASES_FILE, purchases) # # هذه الدالة ستتغير لاحقاً
+    save_json_file(PURCHASES_FILE, purchases)
 
-    all_servers_data = load_json_file(SERVERS_FILE, []) # # هذه الدالة ستتغير لاحقاً
+    from keyboards.server_kb import save_servers_data
+    all_servers_data = load_json_file(SERVERS_FILE, [])
     for entry in all_servers_data:
         if entry["platform"] == target_purchase["platform"] and entry["country"] == target_purchase["country"]:
             for s in entry.get("servers", []):
@@ -640,7 +655,7 @@ async def cancel_fake_number(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     s["quantity"] = s.get("quantity", 0) + 1
                     break
             break
-    save_servers_data(all_servers_data) # # هذه الدالة ستتغير لاحقاً
+    save_servers_data(all_servers_data)
 
     await query.message.edit_text(
         messages["number_cancelled_success"].format(
@@ -648,8 +663,8 @@ async def cancel_fake_number(update: Update, context: ContextTypes.DEFAULT_TYPE)
             price=price,
             currency=messages["price_currency"]
         ) + "\n" +
-        messages["new_balance_info"].format(balance=get_user_balance(user_id), currency=messages["price_currency"]),
-        parse_mode="HTML",
+        messages["new_balance_info"].format(balance=get_user_balance(user_id, user.to_dict()), currency=messages["price_currency"]),
+        parse_mode='HTML',
         reply_markup=create_reply_markup([
             back_button(text=messages["back_button_text"], lang_code=lang_code)
         ])

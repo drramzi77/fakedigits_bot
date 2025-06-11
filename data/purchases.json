@@ -245,6 +245,144 @@
       "fake_number": "966515867267",
       "status": "cancelled",
       "date": "2025-06-11 05:03:09"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "sa",
+      "server_name": "💎 سيرفر مميز",
+      "server_id": 3,
+      "price": 9,
+      "fake_number": "966541422853",
+      "status": "active",
+      "date": "2025-06-11 07:40:44",
+      "fake_code": "793912"
+    },
+    {
+      "platform": "Telegram",
+      "country": "sa",
+      "server_name": "⚡ تيلي سيرفر سريع",
+      "server_id": 1,
+      "price": 4,
+      "fake_number": "966558896089",
+      "status": "cancelled",
+      "date": "2025-06-11 07:41:01"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "ph",
+      "server_name": "💎 سيرفر مميز",
+      "server_id": 2,
+      "price": 5,
+      "fake_number": "966565203575",
+      "status": "active",
+      "date": "2025-06-11 22:49:28",
+      "fake_code": "325202"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "ng",
+      "server_name": "⚡ سيرفر سريع",
+      "server_id": 1,
+      "price": 3,
+      "fake_number": "966521357149",
+      "status": "active",
+      "date": "2025-06-11 23:48:25",
+      "fake_code": "173305"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "sa",
+      "server_name": "💎 سيرفر مميز",
+      "server_id": 3,
+      "price": 9,
+      "fake_number": "966540634101",
+      "status": "active",
+      "date": "2025-06-12 00:12:00",
+      "fake_code": "973006"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "eg",
+      "server_name": "🎯 سيرفر موثوق",
+      "server_id": 2,
+      "price": 6,
+      "fake_number": "966529117535",
+      "status": "awaiting_code",
+      "date": "2025-06-12 00:24:38"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "eg",
+      "server_name": "🎯 سيرفر موثوق",
+      "server_id": 2,
+      "price": 6,
+      "fake_number": "966542762973",
+      "status": "active",
+      "date": "2025-06-12 00:25:59",
+      "fake_code": "172566"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "in",
+      "server_name": "🎯 سيرفر موثوق",
+      "server_id": 1,
+      "price": 2,
+      "fake_number": "966534016275",
+      "status": "awaiting_code",
+      "date": "2025-06-12 00:26:20"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "in",
+      "server_name": "🎯 سيرفر موثوق",
+      "server_id": 1,
+      "price": 2,
+      "fake_number": "966537744066",
+      "status": "cancelled",
+      "date": "2025-06-12 00:52:11"
+    },
+    {
+      "platform": "Telegram",
+      "country": "sa",
+      "server_name": "⚡ تيلي سيرفر سريع",
+      "server_id": 1,
+      "price": 4,
+      "fake_number": "966518643818",
+      "status": "active",
+      "date": "2025-06-12 00:52:23",
+      "fake_code": "452087"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "ca",
+      "server_name": "⚡ سيرفر سريع",
+      "server_id": 1,
+      "price": 4,
+      "fake_number": "966541519422",
+      "status": "active",
+      "date": "2025-06-12 01:42:21",
+      "fake_code": "352699"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "us",
+      "server_name": "🎯 سيرفر موثوق",
+      "server_id": 2,
+      "price": 6,
+      "fake_number": "966570466108",
+      "status": "cancelled",
+      "date": "2025-06-12 01:42:31"
+    },
+    {
+      "platform": "Telegram",
+      "country": "fr",
+      "server_name": "🎯 تيلي سيرفر موثوق",
+      "server_id": 1,
+      "price": 4,
+      "fake_number": "966569468301",
+      "status": "active",
+      "date": "2025-06-12 01:44:17",
+      "fake_code": "158992"
     }
   ]
 }

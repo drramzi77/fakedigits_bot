@@ -15,42 +15,43 @@ async def show_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     user = update.effective_user
     user_id = user.id
-    balance = get_user_balance(user_id) # # هذه الدالة تحتاج للتحديث لاحقاً لقراءة من DB
+    # # تم التعديل هنا لتمرير user.to_dict()
+    balance = get_user_balance(user_id, user.to_dict())
 
-    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE) # # تحديد لغة المستخدم
-    messages = get_messages(lang_code) # # جلب النصوص باللغة المطلوبة
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
 
     # الاسم الظاهر (username أو الاسم الكامل)
     display_name = user.username if user.username else f"{user.first_name} {user.last_name or ''}"
 
     message = (
-        messages["dashboard_welcome"].format(display_name=display_name) + "\n\n" + # # استخدام النص المترجم
-        messages["dashboard_id"].format(user_id=user_id) + "\n" + # # استخدام النص المترجم
-        messages["dashboard_balance"].format(balance=balance, currency=messages["price_currency"]) + "\n\n" + # # **التعديل هنا: تم إضافة currency**
-        messages["dashboard_channel_promo"].format(channel_link="@FakeDigitsPlus") + "\n" + # # استخدام النص المترجم
-        messages["dashboard_choose_option"] # # استخدام النص المترجم
+        messages["dashboard_welcome"].format(display_name=display_name) + "\n\n" +
+        messages["dashboard_id"].format(user_id=user_id) + "\n" +
+        messages["dashboard_balance"].format(balance=balance, currency=messages["price_currency"]) + "\n\n" +
+        messages["dashboard_channel_promo"].format(channel_link="@FakeDigitsPlus") + "\n" +
+        messages["dashboard_choose_option"]
     )
 
     if update.callback_query:
         await update.callback_query.message.edit_text(
-            message, reply_markup=dashboard_keyboard(user_id, lang_code), parse_mode="HTML" # # تمرير lang_code
+            message, reply_markup=dashboard_keyboard(user_id, lang_code), parse_mode="HTML"
         )
     elif update.message:
         await update.message.reply_text(
-            message, reply_markup=dashboard_keyboard(user_id, lang_code), parse_mode="HTML" # # تمرير lang_code
+            message, reply_markup=dashboard_keyboard(user_id, lang_code), parse_mode="HTML"
         )
 
-def recharge_options_keyboard(lang_code: str = DEFAULT_LANGUAGE): # # تم إضافة معامل lang_code
+def recharge_options_keyboard(lang_code: str = DEFAULT_LANGUAGE):
     """
     ينشئ لوحة مفاتيح الأزرار لخيارات شحن الرصيد.
     """
-    messages = get_messages(lang_code) # # جلب النصوص باللغة المطلوبة
+    messages = get_messages(lang_code)
 
     return create_reply_markup([
         [
-            InlineKeyboardButton(messages["recharge_from_admin_button"], callback_data="recharge_admin") # # استخدام النص المترجم
+            InlineKeyboardButton(messages["recharge_from_admin_button"], callback_data="recharge_admin")
         ],
-        back_button(text=messages["back_button_text"]) # # استخدام النص المترجم لدوال الـ utils_kb
+        back_button(text=messages["back_button_text"])
     ])
 
 
@@ -63,28 +64,28 @@ async def handle_recharge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     user_id = update.effective_user.id
-    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE) # # تحديد لغة المستخدم
-    messages = get_messages(lang_code) # # جلب النصوص باللغة المطلوبة
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
 
     message = (
-        messages["recharge_welcome_message"] + "\n\n" + # # استخدام النص المترجم
-        messages["available_payment_methods"] + "\n" + # # استخدام النص المترجم
+        messages["recharge_welcome_message"] + "\n\n" +
+        messages["available_payment_methods"] + "\n" +
         "━━━━━━━━━━━━━━━━━━━━\n" +
-        messages["payment_method_kareem"] + "\n" + # # استخدام النص المترجم
-        messages["payment_method_vodafone"] + "\n" + # # استخدام النص المترجم
-        messages["payment_method_zain"] + "\n" + # # استخدام النص المترجم
-        messages["payment_method_crypto"] + "\n" + # # استخدام النص المترجم
-        messages["payment_method_paypal"] + "\n" + # # استخدام النص المترجم
-        messages["payment_method_other"] + "\n" + # # استخدام النص المترجم
+        messages["payment_method_kareem"] + "\n" +
+        messages["payment_method_vodafone"] + "\n" +
+        messages["payment_method_zain"] + "\n" +
+        messages["payment_method_crypto"] + "\n" +
+        messages["payment_method_paypal"] + "\n" +
+        messages["payment_method_other"] + "\n" +
         "━━━━━━━━━━━━━━━━━━━━\n\n" +
-        messages["send_proof_message"].format(user_id=user_id) + "\n\n" + # # استخدام النص المترجم
-        messages["contact_admin_message"].format(admin_username="@DrRamzi0") + "\n" + # # استخدام النص المترجم
-        messages["press_button_to_proceed"] # # استخدام النص المترجم
+        messages["send_proof_message"].format(user_id=user_id) + "\n\n" +
+        messages["contact_admin_message"].format(admin_username="@DrRamzi0") + "\n" +
+        messages["press_button_to_proceed"]
     )
 
     await query.message.edit_text(
         message,
-        reply_markup=recharge_options_keyboard(lang_code), # # تمرير lang_code
+        reply_markup=recharge_options_keyboard(lang_code),
         parse_mode="HTML"
     )
 
@@ -96,16 +97,16 @@ async def handle_recharge_admin(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
 
-    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE) # # تحديد لغة المستخدم
-    messages = get_messages(lang_code) # # جلب النصوص باللغة المطلوبة
+    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
+    messages = get_messages(lang_code)
 
     await query.message.edit_text(
-        messages["recharge_admin_title"] + "\n\n" + # # استخدام النص المترجم
-        messages["contact_dev_message"].format(dev_link="https://t.me/DrRamzi0") + "\n\n" + # # استخدام النص المترجم
-        messages["send_proof_manual_recharge"] + "\n\n" + # # استخدام النص المترجم
-        messages["back_to_previous_menu"], # # استخدام النص المترجم
+        messages["recharge_admin_title"] + "\n\n" +
+        messages["contact_dev_message"].format(dev_link="https://t.me/DrRamzi0") + "\n\n" +
+        messages["send_proof_manual_recharge"] + "\n\n" +
+        messages["back_to_previous_menu"],
         reply_markup=create_reply_markup([
-            back_button(callback_data="recharge", text=messages["back_button_text"]) # # استخدام النص المترجم
+            back_button(callback_data="recharge", text=messages["back_button_text"])
         ]),
         parse_mode="HTML"
     )

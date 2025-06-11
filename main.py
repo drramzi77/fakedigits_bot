@@ -27,7 +27,7 @@ from telegram.ext import (
 # ✅ هذه الدوال مستخدمة كـ handlers مباشرة
 from handlers.admin_users import (
     handle_admin_users, handle_block_user, handle_delete_user, handle_edit_user_balance,
-    confirm_delete_user, back_to_dashboard_clear_admin_search, ensure_user_exists
+    confirm_delete_user, back_to_dashboard_clear_admin_search # # تم إزالة ensure_user_exists من هنا
 )
 from handlers.agent_handler import show_agent_info, apply_as_agent
 from handlers.category_handler import (
@@ -54,6 +54,8 @@ from utils.check_balance import check_balance
 from utils.check_subscription import is_user_subscribed
 from config import BOT_TOKEN, REQUIRED_CHANNELS, ADMINS, DEFAULT_LANGUAGE
 
+# # استيراد ensure_user_exists من طبقة الخدمة الجديدة
+from services.user_service import ensure_user_exists # <-- تم التعديل هنا
 
 # ✅ هذه الدوال يتم استيرادها الآن مباشرةً من input_router
 from handlers.input_router import handle_all_text_input
@@ -112,7 +114,7 @@ async def check_subscription_button_handler(update: Update, context: ContextType
         await query.edit_message_text(messages["subscribed_success"])
     else:
         await query.edit_message_text(
-            messages["not_subscribed_channel_retry"].format(channel_link=REQUIRED_CHANNELS[0]), # # استخدام أول قناة كـ link
+            messages["not_subscribed_channel_retry"].format(channel_link=REQUIRED_CHANNELS[0]),
             reply_markup=subscription_buttons(lang_code)
         )
 
@@ -151,8 +153,8 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # إرسال تفاصيل الخطأ للمشرفين
     admin_message = (
         f"⚠️ <b>{messages['bot_error_alert']}</b>\n\n"
-        f"<b>{messages['update_info']}:</b> <code>{html.escape(str(update))}</code>\n" # # تم تأمين نص Update
-        f"<b>{messages['error_details']}:</b> <code>{html.escape(str(context.error))}</code>" # # تم تأمين نص Error
+        f"<b>{messages['update_info']}:</b> <code>{html.escape(str(update))}</code>\n"
+        f"<b>{messages['error_details']}:</b> <code>{html.escape(str(context.error))}</code>"
     )
     for admin_id in ADMINS:
         try:

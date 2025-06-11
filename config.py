@@ -3,14 +3,18 @@ from dotenv import load_dotenv
 
 load_dotenv() # تحميل متغيرات البيئة من ملف .env
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-REQUIRED_CHANNELS = [
-    "@FakeDigitsPlus",     # قم بتغييرها إلى قنواتك الحقيقية
-]
+# ###########################################
+# إعدادات البوت (يتم تحميلها من متغيرات البيئة لسهولة الإدارة والأمان)
+# ###########################################
 
-ADMINS = [780028688]  # قائمة الـ user_id للمشرفين
+BOT_TOKEN = os.getenv("BOT_TOKEN") # توكن البوت
+# قنوات الاشتراك المطلوبة (يمكن أن تكون قائمة مفصولة بفواصل في .env)
+REQUIRED_CHANNELS = os.getenv("REQUIRED_CHANNELS", "").split(',')
+# تحويل معرفات المشرفين من نص (من .env) إلى قائمة أرقام صحيحة
+ADMINS_STR = os.getenv("ADMINS", "")
+ADMINS = [int(admin_id.strip()) for admin_id in ADMINS_STR.split(',') if admin_id.strip()] if ADMINS_STR else []
 
 # ############## إعدادات اللغة ##############
-DEFAULT_LANGUAGE = "ar"  # اللغة الافتراضية للبوت (مثلاً: "ar" للعربية، "en" للإنجليزية)
-MESSAGES_PATH = "messages" # مسار مجلد ملفات اللغة (مثلاً: "messages")
+DEFAULT_LANGUAGE = os.getenv("DEFAULT_LANGUAGE", "ar") # اللغة الافتراضية للبوت
+MESSAGES_PATH = os.getenv("MESSAGES_PATH", "messages") # مسار مجلد ملفات اللغة
 # ###########################################
