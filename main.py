@@ -6,7 +6,7 @@
 يقوم بتهيئة التطبيق، وتعريف معالجات الأوامر والأزرار،
 وإدارة تفاعلات المستخدمين مع البوت.
 """
-
+from keyboards.language_kb import language_keyboard
 import logging
 from datetime import datetime
 from utils.logger import setup_logging
@@ -79,21 +79,22 @@ def subscription_buttons(lang_code: str = DEFAULT_LANGUAGE):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     معالج الأمر /start.
-    يتحقق من اشتراك المستخدم ويقدم رسالة ترحيبية أو يطلب الاشتراك.
+    يعرض رسالة ترحيب بلغتين مع اختيار اللغة قبل الاستمرار.
     """
     user = update.effective_user
     ensure_user_exists(user.id, user.to_dict())
 
-    lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
-    messages = get_messages(lang_code)
+    # عرض رسالة ترحيبية مع اختيار اللغة
+    welcome_text = (
+        "🌐 يرجى اختيار لغتك للاستمرار في استخدام البوت:\n\n"
+        "🌐 Please choose your language to continue using the bot:"
+    )
 
-    if await is_user_subscribed(update, context):
-        await update.message.reply_text(messages["subscribed_success"])
-    else:
-        await update.message.reply_text(
-            messages["not_subscribed_channel"].format(channel_link=REQUIRED_CHANNELS[0]), # # استخدام أول قناة كـ link
-            reply_markup=subscription_buttons(lang_code)
-        )
+    await update.message.reply_text(
+        welcome_text,
+        reply_markup=language_keyboard()
+    )
+
 
 # زر التحقق
 async def check_subscription_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):

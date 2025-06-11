@@ -116,18 +116,18 @@ async def show_general_offers(update: Update, context: ContextTypes.DEFAULT_TYPE
     messages = get_messages(lang_code)
 
     text = (
-        messages["general_offers_title"] + "\n\n" + # # استخدام النص المترجم
-        messages["general_offers_whatsapp_telegram"] + "\n" + # # استخدام النص المترجم
-        messages["general_offers_best_prices"] + "\n\n" + # # استخدام النص المترجم
-        messages["choose_platform_for_offers_prompt"] # # استخدام النص المترجم
+        messages["general_offers_title"] + "\n\n" +
+        messages["general_offers_whatsapp_telegram"] + "\n" +
+        messages["general_offers_best_prices"] + "\n\n" +
+        messages["choose_platform_for_offers_prompt"]
     )
 
     buttons = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton(messages["whatsapp_offers_button"], callback_data="wa_offers"), # # استخدام النص المترجم
-            InlineKeyboardButton(messages["telegram_offers_button"], callback_data="tg_offers") # # استخدام النص المترجم
+            InlineKeyboardButton(messages["whatsapp_offers_button"], callback_data="wa_offers"),
+            InlineKeyboardButton(messages["telegram_offers_button"], callback_data="tg_offers")
         ],
-        [back_button(text=messages["back_button_text"], callback_data="back_to_dashboard", lang_code=lang_code)] # # استخدام زر العودة الموحد
+        *[back_button(text=messages["back_button_text"], callback_data="back_to_dashboard", lang_code=lang_code)]
     ])
 
     await query.message.edit_text(text, reply_markup=buttons, parse_mode="HTML")

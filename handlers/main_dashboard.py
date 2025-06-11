@@ -3,7 +3,7 @@
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 from keyboards.dashboard_kb import dashboard_keyboard
-from utils.check_balance import get_user_balance
+from utils.balance import get_user_balance # # **تم التعديل هنا: استيراد من utils.balance بدلاً من utils.check_balance**
 from keyboards.utils_kb import back_button, create_reply_markup
 from utils.i18n import get_messages # # تم إضافة هذا السطر لاستيراد دالة جلب النصوص
 from config import DEFAULT_LANGUAGE # # تم إضافة هذا السطر لاستيراد اللغة الافتراضية
@@ -26,7 +26,7 @@ async def show_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = (
         messages["dashboard_welcome"].format(display_name=display_name) + "\n\n" + # # استخدام النص المترجم
         messages["dashboard_id"].format(user_id=user_id) + "\n" + # # استخدام النص المترجم
-        messages["dashboard_balance"].format(balance=balance) + "\n\n" + # # استخدام النص المترجم
+        messages["dashboard_balance"].format(balance=balance, currency=messages["price_currency"]) + "\n\n" + # # **التعديل هنا: تم إضافة currency**
         messages["dashboard_channel_promo"].format(channel_link="@FakeDigitsPlus") + "\n" + # # استخدام النص المترجم
         messages["dashboard_choose_option"] # # استخدام النص المترجم
     )

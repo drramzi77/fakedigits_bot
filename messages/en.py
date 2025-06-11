@@ -1,6 +1,8 @@
 # messages/english.py
 
 messages = {
+    "language_selected_success": "✅ Language selected successfully.\n\nPress the button below to start.",
+    "start_using_bot": "🚀 Start",
     # =========================================================================
     #  General Messages
     # =========================================================================
@@ -25,7 +27,7 @@ messages = {
     "earn_credit_button": "Earn Credit 💰",
     "transfer_credit_button": "Transfer Credit 💸",
     "help_button": "Help ❓",
-    "language_button": "Change Language 🌐",
+    "language_button": "English🌐العربية",
     "admin_panel_button": "Admin Panel ⚙️", # (will be activated later)
     "available_platforms": "Available Platforms", # Button on dashboard
     "quick_search": "Quick Search 🔎", # Button on dashboard
@@ -74,6 +76,7 @@ messages = {
     #  Balance & Recharge
     # =========================================================================
     "recharge_balance_button": "Recharge Balance 💳", # Button on dashboard
+    "withdraw_balance_button": "Withdraw Balance 🏧", # **تمت إضافة هذا السطر لحل المشكلة السابقة**
     "recharge_from_admin_button": "🧑‍💼 Recharge from Admin",
     "recharge_welcome_message": "🟢 <b>Welcome to the Balance Recharge System!</b>\nYou can recharge your bot account using one of the following methods:",
     "available_payment_methods": "💸 <b>Available Payment Methods:</b>",
@@ -110,6 +113,8 @@ messages = {
     "deduct_balance_invalid_amount": "❌ Enter a valid amount.",
     "insufficient_balance_deduct": "❌ Insufficient balance. Current balance: {current_balance} {currency}",
     "balance_deducted_success": "✅ {amount} {currency} deducted from user {user_id}.",
+    "current_balance_prompt": "💰 Your current balance: {balance} {currency}", # **تمت إضافة هذا السطر**
+    "balance_update_success": "✅ User {user_id}'s balance updated to {new_balance} {currency}.", # **تمت إضافة هذا السطر**
 
 
     # =========================================================================
@@ -151,6 +156,7 @@ messages = {
     "transfer_id_explanation": "✅ <b>123456789</b>: User ID",
     "transfer_amount_explanation": "✅ <b>20</b>: Amount to transfer",
     "cancel_button": "❌ Cancel", # General cancel button, might be used in other contexts as well
+    "cancel_button_text": "❌ Cancel", # **تمت إضافة هذا السطر**
 
     "transfer_invalid_format_error": "❌ Incorrect format. Use:\n<code>123456789 20</code>",
     "transfer_invalid_id_or_amount": "❌ Make sure the ID and amount are valid numbers.",
@@ -330,7 +336,6 @@ messages = {
     "how_referral_works": "How the referral system works?\n1. Share the link with your friends.\n2. When your friend signs up and makes a purchase, you'll get {commission_percentage}% of their purchases.",
     "your_referrals_count": "Number of referrals: {count}",
     "view_referral_details_button": "Referral Details 📊",
-
     "earn_credit_title": "🎁 <b>Earn Free Credit!</b>",
     "earn_credit_description": "Invite your friends using your referral code, and for every friend who signs up through your code, you'll automatically receive credit 💸",
     "your_referral_code": "🔗 <b>Your Code:</b> <code>{referral_code}</code>",
@@ -340,6 +345,7 @@ messages = {
     "no_referrals_yet": "🚫 No referrals yet.",
     "referrals_list_title": "📊 <b>Your Referrals:</b>",
     "referral_entry": "👤 {name} — 🗓️ {joined_date}",
+    "view_referrals_button": "View Referrals 📊", # **تمت إضافة هذا السطر**
 
 
     # =========================================================================
@@ -405,6 +411,8 @@ messages = {
     "yes_delete_button": "✅ Yes, Delete",
     "confirm_delete_user_message": "⚠️ Are you sure you want to delete user <code>{user_id}</code>? This action cannot be undone.",
     "user_deleted_success": "🗑️ User <code>{user_id}</code> deleted successfully.",
+    "unbanned_text": "Active", # **تمت إضافة هذا السطر**
+    "banned_text": "Banned",   # **تمت إضافة هذا السطر**
 
 
     # =========================================================================
