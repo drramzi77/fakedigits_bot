@@ -17,4 +17,8 @@ ADMINS = [int(admin_id.strip()) for admin_id in ADMINS_STR.split(',') if admin_i
 # ############## إعدادات اللغة ##############
 DEFAULT_LANGUAGE = os.getenv("DEFAULT_LANGUAGE", "ar") # اللغة الافتراضية للبوت
 MESSAGES_PATH = os.getenv("MESSAGES_PATH", "messages") # مسار مجلد ملفات اللغة
+
 # ###########################################
+# إعدادات قاعدة البيانات
+# ###########################################
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/bot.db") # مسار ملف قاعدة البيانات SQLite

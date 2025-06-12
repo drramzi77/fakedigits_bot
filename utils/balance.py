@@ -1,42 +1,53 @@
 # utils/balance.py
-import json
-import os
 import logging
 import re
 from telegram import Update
 from telegram.ext import ContextTypes
 from config import ADMINS, DEFAULT_LANGUAGE
-from utils.data_manager import load_json_file, save_json_file
 from utils.i18n import get_messages
-from services.user_service import ensure_user_exists # <-- تم التعديل هنا لاستيرادها من services.user_service
+from services import user_service # # استيراد خدمة المستخدم
+from database.database import get_db # # استيراد get_db لتوفير جلسة قاعدة البيانات
 
 logger = logging.getLogger(__name__)
 
-USER_FILE = os.path.join("data", "users.json")
+# # لم نعد بحاجة إلى USER_FILE لأننا لا نتعامل مع JSON مباشرة
+# USER_FILE = os.path.join("data", "users.json")
 
 def get_user_balance(user_id: int, user_info: dict) -> float:
-    ensure_user_exists(user_id, user_info)
-    users = load_json_file(USER_FILE, default_data={})
-    return users.get(str(user_id), {}).get("balance", 0.0)
+    """
+    يجلب رصيد المستخدم من قاعدة البيانات.
+    يتم التأكد من وجود المستخدم أولاً.
+    """
+    # # التأكد من وجود المستخدم (يتم في كل طلب) - هذه الدالة تتولى الحصول على الجلسة
+    user_service.ensure_user_exists(user_id, user_info)
+    
+    # # الآن نستخدم get_db للحصول على جلسة والتفاعل مع خدمة المستخدم
+    for db in get_db():
+        user = user_service.get_user(db, user_id)
+        return user.balance if user else 0.0 # # إرجاع الرصيد أو 0.0 إذا لم يتم العثور على المستخدم (غير محتمل بعد ensure_user_exists)
 
 def set_user_balance(user_id: int, new_balance: float, user_info: dict):
-    ensure_user_exists(user_id, user_info)
-    users = load_json_file(USER_FILE, default_data={})
-    uid = str(user_id)
-    users[uid] = users.get(uid, {})
-    users[uid]["balance"] = round(new_balance, 2)
-    save_json_file(USER_FILE, users)
-    logger.info(f"تم تعيين رصيد المستخدم {user_id} إلى {new_balance}.")
+    """
+    يعين رصيد المستخدم في قاعدة البيانات.
+    """
+    user_service.ensure_user_exists(user_id, user_info)
+    for db in get_db():
+        user_service.update_user(db, user_id, balance=round(new_balance, 2))
+        logger.info(f"تم تعيين رصيد المستخدم {user_id} إلى {new_balance}.")
 
 def update_balance(user_id: int, amount: float, user_info: dict):
-    ensure_user_exists(user_id, user_info)
-    users = load_json_file(USER_FILE, default_data={})
-    uid = str(user_id)
-    users[uid] = users.get(uid, {})
-    current = users[uid].get("balance", 0.0)
-    users[uid]["balance"] = round(current + amount, 2)
-    save_json_file(USER_FILE, users)
-    logger.info(f"تم تحديث رصيد المستخدم {user_id} بمقدار {amount}. الرصيد الجديد: {users[uid]['balance']}.")
+    """
+    يحدث رصيد المستخدم في قاعدة البيانات بزيادة أو نقصان.
+    """
+    user_service.ensure_user_exists(user_id, user_info)
+    for db in get_db():
+        user = user_service.get_user(db, user_id)
+        if user:
+            new_balance = round(user.balance + amount, 2)
+            user_service.update_user(db, user_id, balance=new_balance)
+            logger.info(f"تم تحديث رصيد المستخدم {user_id} بمقدار {amount}. الرصيد الجديد: {new_balance}.")
+        else:
+            logger.warning(f"لم يتم العثور على المستخدم {user_id} لتحديث الرصيد.")
 
 async def add_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -91,10 +102,11 @@ async def add_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        users_data = load_json_file(USER_FILE, default_data={})
-        target_user_info = users_data.get(str(final_target_user_id), {"id": final_target_user_id})
-        
-        update_balance(final_target_user_id, amount, target_user_info)
+        # # هنا نستخدم user_service.ensure_user_exists و update_balance مباشرة
+        # # لا نحتاج لـ load_json_file أو users_data هنا
+        user_service.ensure_user_exists(final_target_user_id, {"id": final_target_user_id}) # # التأكد من وجود المستخدم المستهدف
+        update_balance(final_target_user_id, amount, {"id": final_target_user_id}) # # update_balance تتولى الحصول على الجلسة والتعامل مع DB
+
         await update.message.reply_text(messages["balance_added_success"].format(amount=amount, currency=messages["price_currency"], user_id=final_target_user_id))
         logger.info(f"المشرف {user_id} أضاف {amount} إلى {final_target_user_id}.")
     except Exception as e:
@@ -142,15 +154,16 @@ async def deduct_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        users_data = load_json_file(USER_FILE, default_data={})
-        target_user_info = users_data.get(str(final_target_user_id), {"id": final_target_user_id})
+        # # هنا نستخدم user_service.ensure_user_exists و get_user_balance و update_balance مباشرة
+        # # لا نحتاج لـ load_json_file أو users_data هنا
+        user_service.ensure_user_exists(final_target_user_id, {"id": final_target_user_id}) # # التأكد من وجود المستخدم المستهدف
 
-        current = get_user_balance(final_target_user_id, target_user_info)
+        current = get_user_balance(final_target_user_id, {"id": final_target_user_id}) # # جلب الرصيد
         if current < amount:
             await update.message.reply_text(messages["insufficient_balance_deduct"].format(current_balance=current, currency=messages["price_currency"]))
             return
 
-        update_balance(final_target_user_id, -amount, target_user_info)
+        update_balance(final_target_user_id, -amount, {"id": final_target_user_id}) # # تحديث الرصيد
         await update.message.reply_text(messages["balance_deducted_success"].format(amount=amount, currency=messages["price_currency"], user_id=final_target_user_id))
     except Exception as e:
         logger.error(f"المشرف {user_id} فشل في خصم {amount} من {final_target_user_id}: {e}", exc_info=True)

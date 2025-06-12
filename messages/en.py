@@ -37,7 +37,7 @@ messages = {
     "view_transfer_logs": "View Transfer Logs 📜", # Button for admins on dashboard
     "admin_users": "Admin Users 🛠️", # Button for admins on dashboard
     "back_button_text": "🔙 Back", # General back button text
-    "back_to_dashboard_button_text": "🔙 Back to Main Dashboard", # Back button from app selection to main dashboard
+    "back_to_dashboard_button_text": "🔙 Back ", # Back button from app selection to main dashboard
 
 
     # =========================================================================

@@ -383,6 +383,17 @@
       "status": "active",
       "date": "2025-06-12 01:44:17",
       "fake_code": "158992"
+    },
+    {
+      "platform": "WhatsApp",
+      "country": "sa",
+      "server_name": "💎 سيرفر مميز",
+      "server_id": 3,
+      "price": 9,
+      "fake_number": "966523050153",
+      "status": "active",
+      "date": "2025-06-12 03:37:47",
+      "fake_code": "211412"
     }
   ]
 }

@@ -2,15 +2,18 @@
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from keyboards.server_kb import load_servers
-from utils.balance import get_user_balance
-from utils.data_manager import load_json_file
+# from keyboards.server_kb import load_servers # لم نعد بحاجة لها
+# from utils.data_manager import load_json_file # لم نعد بحاجة لها
+from utils.balance import get_user_balance # هذه الدالة تم تحديثها لاستخدام DB
 from keyboards.utils_kb import back_button, create_reply_markup
 from utils.i18n import get_messages
 from config import DEFAULT_LANGUAGE
 from keyboards.countries_kb import get_flag # # تم استيراد get_flag للحصول على الأعلام
+# # استيراد خدمة السيرفرات ودالة get_db
+from services import server_service
+from database.database import get_db
 
-# ✅ خريطة البحث باللغتين (ستظل كما هي في هذه المرحلة)
+# ✅ خريطة البحث باللغتين (ستظل كما هي)
 ALL_COUNTRIES = {
     "السعودية": "sa", "saudi arabia": "sa", "🇸🇦": "sa",
     "مصر": "eg", "egypt": "eg", "🇪🇬": "eg",
@@ -78,7 +81,11 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop("awaiting_country_input", None)
         return
 
-    servers = load_servers(platform, country_code)
+    servers = []
+    for db in get_db(): # # استخدام get_db
+        # # استخدام خدمة السيرفرات لجلب السيرفرات حسب المنصة والدولة
+        servers = server_service.get_servers_by_platform_and_country(db, platform, country_code)
+    
     if not servers:
         await update.message.reply_text(
             messages["no_servers_available_country_quick_search"],
@@ -96,18 +103,18 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     country_name_key = f"country_name_{country_code}"
     country_name = messages.get(country_name_key, text.title())
 
-    for s in servers:
+    for s in servers: # # التكرار على كائنات Server
         label = messages["server_button_label"].format(
             emoji="✨",
-            server_name=s['name'],
-            price=s['price'],
+            server_name=s.server_name, # # الوصول لـ .server_name
+            price=s.price, # # الوصول لـ .price
             currency=messages["price_currency"],
-            quantity=s.get('quantity', 0),
+            quantity=s.quantity, # # الوصول لـ .quantity
             available_text=messages["available_quantity"]
         )
         buttons.append([InlineKeyboardButton(
             label,
-            callback_data=f"buy_{platform}_{country_code}_{s['id']}"
+            callback_data=f"buy_{platform}_{country_code}_{s.server_id}" # # استخدام .server_id
         )])
     buttons.append(back_button(callback_data=f"select_app_{platform}", text=messages["back_button_text"], lang_code=lang_code))
 

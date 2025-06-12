@@ -1,21 +1,26 @@
 # handlers/transfer_handler.py
 
-import json
 import logging
-import os
+# import json # لم نعد بحاجة لها
+# import os # لم نعد بحاجة لها
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from utils.balance import get_user_balance, update_balance
+from utils.balance import get_user_balance, update_balance # هذه الدوال تم تحديثها لاستخدام DB
 from config import ADMINS, DEFAULT_LANGUAGE
-from utils.data_manager import load_json_file, save_json_file
+# from utils.data_manager import load_json_file, save_json_file # لم نعد بحاجة لها
 from keyboards.utils_kb import back_button, create_reply_markup
 from utils.i18n import get_messages
+# # استيراد الخدمات الجديدة ودالة get_db
+from services import user_service, transfer_service
+from database.database import get_db
+
 
 logger = logging.getLogger(__name__)
 
-TRANSFERS_FILE = os.path.join("data", "transfers.json")
-USERS_FILE = os.path.join("data", "users.json") # # تم التأكد من وجود هذا المتغير
+# # لم نعد بحاجة لـ TRANSFERS_FILE و USERS_FILE
+# TRANSFERS_FILE = os.path.join("data", "transfers.json")
+# USERS_FILE = os.path.join("data", "users.json")
 
 def contact_admin_button(lang_code: str = DEFAULT_LANGUAGE):
     """
@@ -27,22 +32,23 @@ def contact_admin_button(lang_code: str = DEFAULT_LANGUAGE):
         back_button(text=messages["back_button_text"], lang_code=lang_code)
     ])
 
-def log_transfer(sender_id, target_id, amount, fee):
-    """
-    يسجل تفاصيل عملية تحويل الرصيد في ملف سجل التحويلات.
-    """
-    transfer = {
-        "from": sender_id,
-        "to": target_id,
-        "amount": amount,
-        "fee": fee,
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
+# # لم نعد بحاجة لهذه الدالة المنفصلة، سيتم استدعاء transfer_service.record_transfer مباشرة
+# def log_transfer(sender_id, target_id, amount, fee):
+#     """
+#     يسجل تفاصيل عملية تحويل الرصيد في ملف سجل التحويلات.
+#     """
+#     transfer = {
+#         "from": sender_id,
+#         "to": target_id,
+#         "amount": amount,
+#         "fee": fee,
+#         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+#     }
 
-    data = load_json_file(TRANSFERS_FILE, [])
-    data.append(transfer)
-    save_json_file(TRANSFERS_FILE, data)
-    logger.info(f"تم تسجيل تحويل: من {sender_id} إلى {target_id} بمبلغ {amount}.")
+#     data = load_json_file(TRANSFERS_FILE, [])
+#     data.append(transfer)
+#     save_json_file(TRANSFERS_FILE, data)
+#     logger.info(f"تم تسجيل تحويل: من {sender_id} إلى {target_id} بمبلغ {amount}.")
 
 
 async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -50,9 +56,9 @@ async def start_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     يبدأ عملية تحويل الرصيد.
     يتحقق من رصيد المستخدم ويطلب معرف المستلم والمبلغ.
     """
-    user = update.effective_user # # الحصول على كائن المستخدم
+    user = update.effective_user
     user_id = user.id
-    balance = get_user_balance(user_id, user.to_dict()) # # # تم التعديل: تمرير user.to_dict()
+    balance = get_user_balance(user_id, user.to_dict()) # # استخدام get_user_balance (تم تحديثها)
 
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
     messages = get_messages(lang_code)
@@ -109,7 +115,7 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
     يعالج المدخل النصي من المستخدم لعملية التحويل.
     يتحقق من صحة المعرف والمبلغ ويطلب التأكيد.
     """
-    user = update.effective_user # # الحصول على كائن المستخدم
+    user = update.effective_user
     user_id = user.id
     logger.info(f"handle_transfer_input: المستخدم {user_id} أرسل نص: '{update.message.text}'. user_data: {context.user_data}")
 
@@ -159,6 +165,32 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
         logger.warning(f"المستخدم {user_id} حاول تحويل الرصيد إلى نفسه.")
         return
 
+    # # التحقق من وجود المستخدم المستهدف في قاعدة البيانات
+    target_user_exists = False
+    for db in get_db():
+        target_user = user_service.get_user(db, target_id)
+        if target_user:
+            target_user_exists = True
+        else:
+            # # إذا لم يكن المستخدم المستهدف موجوداً، يمكن أن ننشئه أو نرفض التحويل
+            # # هنا سنرفض التحويل، إذا أردت إنشائه استخدم:
+            # user_service.ensure_user_exists(target_id, {"id": target_id})
+            # target_user_exists = True
+            pass # نتركه False إذا لم نجده
+
+    if not target_user_exists:
+        await update.message.reply_text(
+            messages["transfer_target_user_not_found"], # رسالة جديدة: "المستخدم المستلم غير موجود"
+            reply_markup=create_reply_markup([
+                back_button(text=messages["back_button_text"], lang_code=lang_code)
+            ])
+        )
+        context.user_data.pop("transfer_stage", None)
+        context.user_data.pop("awaiting_input", None)
+        logger.warning(f"المستخدم {user_id} حاول تحويل رصيد إلى مستخدم غير موجود: {target_id}.")
+        return
+
+
     if amount <= 0:
         await update.message.reply_text(
             messages["transfer_amount_must_be_positive"],
@@ -171,7 +203,7 @@ async def handle_transfer_input(update: Update, context: ContextTypes.DEFAULT_TY
         logger.warning(f"المستخدم {user_id} حاول تحويل مبلغ غير موجب: {amount}.")
         return
 
-    balance = get_user_balance(user_id, user.to_dict()) # # تم التعديل: تمرير user.to_dict()
+    balance = get_user_balance(user_id, user.to_dict()) # # استخدام get_user_balance
     fee = round(amount * 0.01, 2)
     total_deduction = round(amount + fee, 2)
 
@@ -267,7 +299,35 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         fee = details["fee"]
         total_deduction = details["total_deduction"]
 
-        current_balance = get_user_balance(user_id, user.to_dict()) # # تم التعديل: تمرير user.to_dict()
+        # # إعادة التحقق من وجود المستخدم المستهدف ومانع الحظر
+        target_user_is_banned = False
+        for db in get_db():
+            target_user_obj = user_service.get_user(db, target_id)
+            if not target_user_obj:
+                await query.edit_message_text(
+                    messages["transfer_target_user_not_found_after_confirm"], # رسالة جديدة
+                    reply_markup=contact_admin_button(lang_code)
+                )
+                logger.warning(f"المستخدم {user_id} حاول تأكيد تحويل إلى مستخدم غير موجود (بعد التأكيد): {target_id}.")
+                context.user_data.pop("transfer_stage", None)
+                context.user_data.pop("transfer_details", None)
+                context.user_data.pop("awaiting_input", None)
+                return
+            if target_user_obj.banned:
+                target_user_is_banned = True
+        
+        if target_user_is_banned:
+            await query.edit_message_text(
+                messages["transfer_target_user_banned"], # رسالة جديدة: "المستخدم المستلم محظور"
+                reply_markup=contact_admin_button(lang_code)
+            )
+            logger.warning(f"المستخدم {user_id} حاول تحويل رصيد إلى مستخدم محظور: {target_id}.")
+            context.user_data.pop("transfer_stage", None)
+            context.user_data.pop("transfer_details", None)
+            context.user_data.pop("awaiting_input", None)
+            return
+
+        current_balance = get_user_balance(user_id, user.to_dict()) # # استخدام get_user_balance
         if current_balance < total_deduction:
             await query.edit_message_text(
                 messages["insufficient_balance_after_check"].format(
@@ -284,13 +344,17 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         try:
-            update_balance(user_id, -total_deduction, user.to_dict()) # # تم التعديل: تمرير user.to_dict()
+            # # تحديث رصيد المرسل
+            update_balance(user_id, -total_deduction, user.to_dict())
             
-            # # الحصول على معلومات المستخدم المستلم لتمريرها إلى update_balance
-            users_data = load_json_file(USERS_FILE, default_data={})
-            target_user_info = users_data.get(str(target_id), {"id": target_id})
-            update_balance(target_id, amount, target_user_info)
-            log_transfer(user_id, target_id, amount, fee)
+            # # تحديث رصيد المستلم
+            # # user_service.ensure_user_exists(target_id, {"id": target_id}) تم التحقق من وجوده في handle_transfer_input
+            for db in get_db():
+                user_service.update_user(db, target_id, balance=target_user_obj.balance + amount) # # استخدام خدمة المستخدم للتحديث
+
+            # # تسجيل التحويل في قاعدة البيانات
+            for db in get_db():
+                transfer_service.record_transfer(db, user_id, target_id, amount, fee)
 
             await query.edit_message_text(
                 messages["transfer_successful_message"].format(
@@ -298,7 +362,7 @@ async def confirm_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     currency=messages["price_currency"],
                     target_id=target_id,
                     fee=fee,
-                    new_balance=get_user_balance(user_id, user.to_dict()) # # تم التعديل: تمرير user.to_dict()
+                    new_balance=get_user_balance(user_id, user.to_dict()) # # استخدام get_user_balance
                 ),
                 parse_mode="HTML",
                 reply_markup=create_reply_markup([
@@ -331,7 +395,7 @@ async def show_transfer_logs(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """
     يعرض آخر 10 تحويلات رصيد بين المستخدمين (للمشرفين فقط).
     """
-    user = update.effective_user # # الحصول على كائن المستخدم
+    user = update.effective_user
     user_id = user.id
 
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
@@ -341,24 +405,28 @@ async def show_transfer_logs(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.callback_query.answer(messages["no_permission_alert"], show_alert=True)
         return
 
-    data = load_json_file(TRANSFERS_FILE, {})
+    recent_transfers = []
+    for db in get_db(): # # استخدام get_db
+        recent_transfers = transfer_service.get_recent_transfers(db, 10) # # جلب آخر 10 تحويلات من DB
 
-    if not data:
-        await update.callback_query.message.edit_text(messages["no_transfers_yet"])
+    if not recent_transfers:
+        await update.callback_query.message.edit_text(messages["no_transfers_yet"],
+                                                      reply_markup=create_reply_markup([
+                                                          back_button(text=messages["back_button_text"], lang_code=lang_code)
+                                                      ]))
         logger.info(f"المشرف {user_id} عرض سجل التحويلات، ولا يوجد أي تحويلات.")
         return
 
-    recent_transfers = data[-10:]
     lines = []
-    for t in reversed(recent_transfers):
+    for t_obj in recent_transfers: # # التكرار على كائنات Transfer
         lines.append(
             messages["transfer_log_entry"].format(
-                sender_id=t['from'],
-                receiver_id=t['to'],
-                amount=t['amount'],
+                sender_id=t_obj.from_user_id, # # الوصول لـ .from_user_id
+                receiver_id=t_obj.to_user_id, # # الوصول لـ .to_user_id
+                amount=t_obj.amount, # # الوصول لـ .amount
                 currency=messages["price_currency"],
-                fee=t['fee'],
-                date=t['timestamp']
+                fee=t_obj.fee, # # الوصول لـ .fee
+                date=t_obj.timestamp.strftime("%Y-%m-%d %H:%M:%S") # # الوصول لـ .timestamp وتنسيقه
             )
         )
 
@@ -415,6 +483,11 @@ async def clear_all_transfers(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.warning(f"المستخدم {user_id} حاول حذف جميع التحويلات بدون صلاحية.")
         return
 
-    save_json_file(TRANSFERS_FILE, [])
-    await update.callback_query.message.edit_text(messages["transfers_cleared_success"])
-    logger.info(f"المشرف {user_id} قام بحذف جميع سجلات التحويلات.")
+    for db in get_db(): # # استخدام get_db
+        deleted_count = transfer_service.delete_all_transfers(db) # # استخدام خدمة التحويلات للحذف
+        
+    await update.callback_query.message.edit_text(messages["transfers_cleared_success"].format(count=deleted_count), # # يمكن إضافة عدد السجلات المحذوفة
+                                                  reply_markup=create_reply_markup([
+                                                      back_button(text=messages["back_button_text"], lang_code=lang_code)
+                                                  ]))
+    logger.info(f"المشرف {user_id} قام بحذف {deleted_count} سجل تحويلات.")

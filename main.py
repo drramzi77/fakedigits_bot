@@ -6,12 +6,13 @@
 يقوم بتهيئة التطبيق، وتعريف معالجات الأوامر والأزرار،
 وإدارة تفاعلات المستخدمين مع البوت.
 """
+import os # # تم إضافة هذا السطر أو التأكد من وجوده
 from keyboards.language_kb import language_keyboard
 import logging
 from datetime import datetime
 from utils.logger import setup_logging
 from utils.i18n import get_messages
-import html # # تم إضافة هذا السطر لاستيراد مكتبة html
+import html
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -23,11 +24,14 @@ from telegram.ext import (
     filters
 )
 
+# استيراد دوال إعداد قاعدة البيانات
+from database.database import create_db_and_tables, initialize_data_from_json
+
 # استيرادات Modules المشروع (handlers) - مجمعة ومنظمة
 # ✅ هذه الدوال مستخدمة كـ handlers مباشرة
 from handlers.admin_users import (
     handle_admin_users, handle_block_user, handle_delete_user, handle_edit_user_balance,
-    confirm_delete_user, back_to_dashboard_clear_admin_search # # تم إزالة ensure_user_exists من هنا
+    confirm_delete_user, back_to_dashboard_clear_admin_search
 )
 from handlers.agent_handler import show_agent_info, apply_as_agent
 from handlers.category_handler import (
@@ -36,7 +40,8 @@ from handlers.category_handler import (
     show_ready_numbers, get_fake_code, cancel_fake_number, show_available_platforms
 )
 from handlers.earn_credit_handler import show_earn_credit_page, view_referrals
-from handlers.favorites_handler import add_to_favorites, handle_favorites
+# # تم تحديث هذا الاستيراد لإضافة delete_favorite_item
+from handlers.favorites_handler import add_to_favorites, handle_favorites, delete_favorite_item
 from handlers.help_handler import handle_usage_guide, handle_contact_support, handle_faq, handle_help
 from handlers.language_handler import show_language_options, set_language
 from handlers.main_dashboard import show_dashboard, handle_recharge, handle_recharge_admin
@@ -55,7 +60,7 @@ from utils.check_subscription import is_user_subscribed
 from config import BOT_TOKEN, REQUIRED_CHANNELS, ADMINS, DEFAULT_LANGUAGE
 
 # # استيراد ensure_user_exists من طبقة الخدمة الجديدة
-from services.user_service import ensure_user_exists # <-- تم التعديل هنا
+from services.user_service import ensure_user_exists
 
 # ✅ هذه الدوال يتم استيرادها الآن مباشرةً من input_router
 from handlers.input_router import handle_all_text_input
@@ -173,6 +178,13 @@ def main():
     الوظيفة الرئيسية لتشغيل البوت.
     تقوم بإنشاء التطبيق، وإضافة جميع المعالجات، وبدء استلام التحديثات.
     """
+    # # إنشاء مجلد البيانات إذا لم يكن موجوداً
+    if not os.path.exists('data'):
+        os.makedirs('data')
+
+    create_db_and_tables() # # إنشاء الجداول
+    initialize_data_from_json() # # استيراد البيانات من JSON (لأول مرة فقط)
+
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     # ————————————————————————————————
@@ -224,6 +236,7 @@ def main():
     app.add_handler(CallbackQueryHandler(start_quick_search, pattern="^quick_search$"))
     app.add_handler(CallbackQueryHandler(handle_favorites, pattern="^favorites$"))
     app.add_handler(CallbackQueryHandler(add_to_favorites, pattern="^fav_"))
+    app.add_handler(CallbackQueryHandler(delete_favorite_item, pattern="^delete_fav_")) # # تم إضافة هذا السطر
 
     # 6. الملف الشخصي والمشتريات (Profile & Purchases)
     app.add_handler(CallbackQueryHandler(handle_profile, pattern="^profile$"))

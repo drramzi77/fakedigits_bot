@@ -1,22 +1,26 @@
 # handlers/profile_handler.py
 
 import logging
-import os
+# import os # لم نعد بحاجة لـ os.path.join لملفات البيانات
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
-from utils.balance import get_user_balance
-import datetime
-import json
-from utils.data_manager import load_json_file
+from utils.balance import get_user_balance # هذه الدالة تم تحديثها لاستخدام DB
+# import datetime # لم نعد بحاجة لها هنا لكونها مستخدمة في models.py و database.py
+# import json # لم نعد بحاجة لها
+# from utils.data_manager import load_json_file # لم نعد بحاجة لها
 from keyboards.utils_kb import back_button, create_reply_markup
 from utils.i18n import get_messages
 from config import DEFAULT_LANGUAGE
 from telegram.error import BadRequest
+# # استيراد الخدمات الجديدة ودالة get_db
+from services import user_service, purchase_service
+from database.database import get_db
 
 logger = logging.getLogger(__name__)
 
-PURCHASES_FILE = os.path.join("data", "purchases.json")
-USERS_FILE = os.path.join("data", "users.json")
+# # لم نعد بحاجة لـ PURCHASES_FILE و USERS_FILE لأننا سنتعامل مع DB مباشرة
+# PURCHASES_FILE = os.path.join("data", "purchases.json")
+# USERS_FILE = os.path.join("data", "users.json")
 
 async def handle_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -27,7 +31,7 @@ async def handle_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     user = update.effective_user
-    user_id = str(user.id)
+    user_id = user.id # # معرف المستخدم كـ int
     username = f"@{user.username}" if user.username else "لا يوجد"
     fullname = user.full_name
     balance = get_user_balance(user.id, user.to_dict()) # # تم التعديل: تمرير user.to_dict()
@@ -36,19 +40,18 @@ async def handle_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     messages = get_messages(lang_code)
 
     first_use_date = messages["not_available"]
-    users_data = load_json_file(USERS_FILE, {})
-    user_data = users_data.get(user_id, {})
-    if "created_at" in user_data:
-        first_use_date = user_data["created_at"]
-    else:
-        logger.warning(f"ملف المستخدمين '{USERS_FILE}' غير موجود أو المستخدم {user_id} لا يملك تاريخ تسجيل.")
-
     total_orders = 0
     total_spent = 0
-    all_orders = load_json_file(PURCHASES_FILE, {})
-    user_orders = all_orders.get(user_id, [])
-    total_orders = len(user_orders)
-    total_spent = sum([order.get("price", 0) for order in user_orders])
+
+    for db in get_db(): # # استخدام get_db
+        user_db_obj = user_service.get_user(db, user_id) # # جلب كائن المستخدم من DB
+        if user_db_obj:
+            first_use_date = user_db_obj.created_at.strftime("%Y-%m-%d %H:%M:%S") # # الوصول إلى .created_at مباشرة
+        
+        # # جلب إحصائيات المشتريات من خدمة المشتريات
+        total_orders = purchase_service.get_total_orders_by_user(db, user_id)
+        total_spent = purchase_service.get_total_spent_by_user(db, user_id)
+
 
     message = (
         messages["profile_welcome"].format(fullname=fullname) + "\n" +
@@ -86,19 +89,23 @@ async def handle_my_purchases(update: Update, context: ContextTypes.DEFAULT_TYPE
     يعرض آخر 5 مشتريات للمستخدم.
     """
     user = update.effective_user
-    user_id = str(user.id)
+    user_id = user.id # # معرف المستخدم كـ int
     query = update.callback_query
     await query.answer()
 
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
     messages = get_messages(lang_code)
 
-    all_orders = load_json_file(PURCHASES_FILE, {})
-    purchases = all_orders.get(user_id, [])
+    purchases_list = []
+    for db in get_db(): # # استخدام get_db
+        purchases_list = purchase_service.get_user_purchases(db, user_id) # # جلب مشتريات المستخدم من DB
 
-    if not purchases:
+    if not purchases_list:
         try:
-            await query.message.edit_text(messages["no_purchases_found"])
+            await query.message.edit_text(messages["no_purchases_found"],
+                                          reply_markup=create_reply_markup([
+                                              back_button(callback_data="profile", text=messages["back_button_text"], lang_code=lang_code)
+                                          ]))
         except BadRequest as e:
             if "Message is not modified" in str(e):
                 logger.info(f"المستخدم {user_id}: تم محاولة تعديل رسالة المشتريات بمحتوى مطابق. تم تجاهل الخطأ.")
@@ -108,11 +115,13 @@ async def handle_my_purchases(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     message = messages["purchase_history_title"] + "\n━━━━━━━━━━━━━━━\n"
-    for order in purchases[-5:]:
-        date = order.get("date", messages["unknown_value_char"])
-        platform = order.get("platform", messages["unknown_value_char"])
-        country_code = order.get("country", messages["unknown_value_char"])
-        price = order.get("price", 0)
+    # # عرض آخر 5 مشتريات
+    for order_obj in purchases_list[-5:]:
+        # # الوصول إلى الخصائص مباشرة من كائن Purchase
+        date_str = order_obj.date.strftime("%Y-%m-%d %H:%M:%S") if order_obj.date else messages["unknown_value_char"]
+        platform = order_obj.platform
+        country_code = order_obj.country
+        price = order_obj.price
 
         country_name_key = f"country_name_{country_code}"
         country_name = messages.get(country_name_key, country_code.upper())
@@ -122,7 +131,7 @@ async def handle_my_purchases(update: Update, context: ContextTypes.DEFAULT_TYPE
             country_name=country_name,
             price=price,
             currency=messages["price_currency"],
-            date=date
+            date=date_str
         ) + "\n\n"
 
     keyboard = create_reply_markup([

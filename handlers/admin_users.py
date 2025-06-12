@@ -1,29 +1,27 @@
 # handlers/admin_users.py
-import json
+# import json # لم نعد بحاجة لها
 import logging
-import os
+# import os # لم نعد بحاجة لها
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-# # تم حذف get_user_balance و set_user_balance من هنا لكي لا يكون هناك استيراد دائري
-# # من utils.balance بعد التعديل الأخير في utils.balance.py
+
 from handlers.main_dashboard import show_dashboard
-from utils.data_manager import load_json_file, save_json_file
+# from utils.data_manager import load_json_file, save_json_file # لم نعد بحاجة لها
 from keyboards.utils_kb import back_button, create_reply_markup
 from utils.i18n import get_messages
 from config import ADMINS, DEFAULT_LANGUAGE
-from services.user_service import ensure_user_exists, load_users, save_users # <-- تم التعديل هنا لاستيرادها من الملف الجديد
+# # استيراد خدمة المستخدم ودالة الحصول على الجلسة
+from services import user_service
+from database.database import get_db
 
 logger = logging.getLogger(__name__)
 
-# 📁 مسار ملف المستخدمين (لا يزال مطلوبًا هنا لـ load_json_file إذا كانت تستخدم بشكل مباشر)
-# # ولكن سنستخدم load_users و save_users من user_service
-USER_FILE = os.path.join("data", "users.json") 
-
-# # تم حذف تعريف load_users من هنا لأنه تم نقله إلى services/user_service.py
-# # تم حذف تعريف save_users من هنا لأنه تم نقله إلى services/user_service.py
-# # تم حذف تعريف ensure_user_exists من هنا لأنه تم نقله إلى services/user_service.py
-
+# # لم نعد بحاجة لـ USER_FILE أو load_users/save_users القديمة
+# USER_FILE = os.path.join("data", "users.json") 
+# # تم حذف تعريف load_users من هنا
+# # تم حذف تعريف save_users من هنا
+# # تم حذف تعريف ensure_user_exists من هنا
 
 async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -39,17 +37,23 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.answer()
         context.user_data["awaiting_input"] = "admin_user_search"
 
-    users = load_users() # # تم التعديل: استخدام load_users من services.user_service
+    all_users = []
+    for db in get_db(): # # استخدام get_db للحصول على جلسة
+        all_users = user_service.get_all_users_data(db) # # استخدام خدمة المستخدم لجلب جميع المستخدمين
+
     search_term = context.user_data.get("admin_search", "").lower()
     results = []
 
-    for uid, info in users.items():
-        display_name = f"{info.get('first_name', '')} {info.get('last_name', '')}".strip()
+    for user_obj in all_users: # # التكرار على كائنات المستخدم مباشرة
+        uid = str(user_obj.id)
+        display_name = f"{user_obj.first_name or ''} {user_obj.last_name or ''}".strip()
         if not display_name:
             display_name = messages["user_fallback_name"].format(user_id=uid)
 
-        if search_term in uid.lower() or (display_name and search_term in display_name.lower()) or (info.get("username") and search_term in info.get("username").lower()):
-            results.append((uid, display_name, info.get("balance", 0), info.get("banned", False)))
+        if search_term in uid.lower() or \
+           (display_name and search_term in display_name.lower()) or \
+           (user_obj.username and search_term in user_obj.username.lower()):
+            results.append((uid, display_name, user_obj.balance, user_obj.banned)) # # الوصول إلى الخصائص مباشرة
 
     if not results:
         message_text = messages["no_matching_users"]
@@ -67,7 +71,7 @@ async def handle_admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text = messages["admin_user_management_title"] + "\n\n"
     buttons = []
 
-    for uid, name, balance, banned in results[:10]:
+    for uid, name, balance, banned in results[:10]: # # عرض أول 10 نتائج
         ban_status = messages["banned_status"] if banned else messages["active_status"]
         text += messages["admin_user_info_line"].format(
             name=name,
@@ -165,18 +169,16 @@ async def receive_balance_input(update: Update, context: ContextTypes.DEFAULT_TY
         context.user_data.pop("editing_user_id", None)
         return
 
-    user_id_to_edit = context.user_data.get("editing_user_id")
+    user_id_to_edit = int(context.user_data.get("editing_user_id")) # # تحويل معرف المستخدم إلى int
 
-    users = load_users() # # تم التعديل: استخدام load_users من services.user_service
-
-    if user_id_to_edit in users:
-        users[user_id_to_edit]["balance"] = round(new_balance, 2)
-        save_users(users) # # تم التعديل: استخدام save_users من services.user_service
-        await update.message.reply_text(messages["balance_update_success"].format(user_id=user_id_to_edit, new_balance=new_balance, currency=messages["price_currency"]))
-        logger.info(f"المشرف {user_id} عدّل رصيد المستخدم {user_id_to_edit} إلى {new_balance}.")
-    else:
-        await update.message.reply_text(messages["user_not_found_for_edit"])
-        logger.warning(f"المشرف {user_id} حاول تعديل رصيد مستخدم غير موجود: {user_id_to_edit}.")
+    for db in get_db(): # # استخدام get_db
+        updated_user = user_service.update_user(db, user_id_to_edit, balance=round(new_balance, 2)) # # استخدام خدمة المستخدم للتحديث
+        if updated_user:
+            await update.message.reply_text(messages["balance_update_success"].format(user_id=user_id_to_edit, new_balance=new_balance, currency=messages["price_currency"]))
+            logger.info(f"المشرف {user_id} عدّل رصيد المستخدم {user_id_to_edit} إلى {new_balance}.")
+        else:
+            await update.message.reply_text(messages["user_not_found_for_edit"])
+            logger.warning(f"المشرف {user_id} حاول تعديل رصيد مستخدم غير موجود: {user_id_to_edit}.")
 
     context.user_data.pop("edit_balance_mode", None)
     context.user_data.pop("editing_user_id", None)
@@ -193,20 +195,24 @@ async def handle_block_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
     messages = get_messages(lang_code)
 
-    user_id_to_toggle = query.data.split("_")[1]
-    users = load_users() # # تم التعديل: استخدام load_users من services.user_service
+    user_id_to_toggle = int(query.data.split("_")[1]) # # تحويل معرف المستخدم إلى int
     admin_id = update.effective_user.id
 
-    if user_id_to_toggle in users:
-        current_status = users[user_id_to_toggle].get("banned", False)
-        users[user_id_to_toggle]["banned"] = not current_status
-        save_users(users) # # تم التعديل: استخدام save_users من services.user_service
-        new_status_text = messages["unbanned_text"] if not current_status else messages["banned_text"]
-        await query.edit_message_text(messages["user_status_updated"].format(user_id=user_id_to_toggle, new_status=new_status_text))
-        logger.info(f"المشرف {admin_id} قام بـ {new_status_text} المستخدم {user_id_to_toggle}.")
-    else:
-        await query.edit_message_text(messages["user_not_found"])
-        logger.warning(f"المشرف {admin_id} حاول حظر/فك حظر مستخدم غير موجود: {user_id_to_toggle}.")
+    for db in get_db(): # # استخدام get_db
+        user_obj = user_service.get_user(db, user_id_to_toggle) # # جلب المستخدم أولاً
+        if user_obj:
+            current_status = user_obj.banned # # الوصول لـ .banned مباشرة
+            updated_user = user_service.update_user(db, user_id_to_toggle, banned=not current_status) # # تحديث الحالة
+            if updated_user:
+                new_status_text = messages["unbanned_text"] if not current_status else messages["banned_text"]
+                await query.edit_message_text(messages["user_status_updated"].format(user_id=user_id_to_toggle, new_status=new_status_text))
+                logger.info(f"المشرف {admin_id} قام بـ {new_status_text} المستخدم {user_id_to_toggle}.")
+            else:
+                await query.edit_message_text(messages["user_not_found"]) # في حال فشل التحديث بعد جلب المستخدم
+                logger.warning(f"المشرف {admin_id} حاول حظر/فك حظر مستخدم غير موجود (بعد جلب): {user_id_to_toggle}.")
+        else:
+            await query.edit_message_text(messages["user_not_found"])
+            logger.warning(f"المشرف {admin_id} حاول حظر/فك حظر مستخدم غير موجود: {user_id_to_toggle}.")
 
 
 async def confirm_delete_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -247,18 +253,17 @@ async def handle_delete_user(update: Update, context: ContextTypes.DEFAULT_TYPE)
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
     messages = get_messages(lang_code)
 
-    user_id_to_delete = query.data.split("_")[3]
-    users = load_users() # # تم التعديل: استخدام load_users من services.user_service
+    user_id_to_delete = int(query.data.split("_")[3]) # # تحويل معرف المستخدم إلى int
     admin_id = update.effective_user.id
 
-    if user_id_to_delete in users:
-        del users[user_id_to_delete]
-        save_users(users) # # تم التعديل: استخدام save_users من services.user_service
-        await query.edit_message_text(messages["user_deleted_success"].format(user_id=user_id_to_delete))
-        logger.info(f"المشرف {admin_id} قام بحذف المستخدم {user_id_to_delete} بعد التأكيد.")
-    else:
-        await query.edit_message_text(messages["user_not_found"])
-        logger.warning(f"المشرف {admin_id} حاول حذف مستخدم غير موجود بعد التأكيد: {user_id_to_delete}.")
+    for db in get_db(): # # استخدام get_db
+        success = user_service.delete_user(db, user_id_to_delete) # # استخدام خدمة المستخدم للحذف
+        if success:
+            await query.edit_message_text(messages["user_deleted_success"].format(user_id=user_id_to_delete))
+            logger.info(f"المشرف {admin_id} قام بحذف المستخدم {user_id_to_delete} بعد التأكيد.")
+        else:
+            await query.edit_message_text(messages["user_not_found"])
+            logger.warning(f"المشرف {admin_id} حاول حذف مستخدم غير موجود بعد التأكيد: {user_id_to_delete}.")
 
 async def back_to_dashboard_clear_admin_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """

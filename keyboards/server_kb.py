@@ -1,59 +1,53 @@
 # keyboards/server_kb.py
 
-import json
 import logging
-import os
+# import json # لم نعد بحاجة لها
+# import os # لم نعد بحاجة لها
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
-from utils.data_manager import load_json_file, save_json_file # # هذه الدوال ستتغير لاحقاً مع DB
+# from utils.data_manager import load_json_file, save_json_file # لم نعد بحاجة لها
 from keyboards.utils_kb import back_button, create_reply_markup
-from utils.i18n import get_messages # # تم إضافة هذا السطر لاستيراد دالة جلب النصوص
-from config import DEFAULT_LANGUAGE # # تم إضافة هذا السطر لاستيراد اللغة الافتراضية
+from utils.i18n import get_messages
+from config import DEFAULT_LANGUAGE
+# # استيراد خدمة السيرفرات ودالة get_db
+from services import server_service
+from database.database import get_db
 
 logger = logging.getLogger(__name__)
 
-SERVERS_FILE = os.path.join("data", "servers.json") # # هذا المسار سيتغير لاحقاً مع DB
+# # لم نعد بحاجة لـ SERVERS_FILE
+# SERVERS_FILE = os.path.join("data", "servers.json")
 
-def load_all_servers_data() -> list:
-    """
-    يُحمّل بيانات جميع السيرفرات المتاحة من ملف JSON.
+# # هذه الدوال لم تعد ضرورية بعد الانتقال إلى services/server_service
+# def load_all_servers_data() -> list:
+#     """
+#     هذه الدالة لم تعد مستخدمة بعد الانتقال إلى قاعدة البيانات.
+#     """
+#     pass
 
-    Returns:
-        list: قائمة بقواميس بيانات السيرفرات.
-    """
-    # # هذه الدالة ستتغير لاحقاً لاستخدام قاعدة البيانات
-    return load_json_file(SERVERS_FILE, [])
-
-def save_servers_data(data: list):
-    """
-    يُحفظ بيانات السيرفرات إلى ملف JSON.
-
-    Args:
-        data (list): قائمة بقواميس بيانات السيرفرات المراد حفظها.
-    """
-    # # هذه الدالة ستتغير لاحقاً لاستخدام قاعدة البيانات
-    save_json_file(SERVERS_FILE, data)
+# def save_servers_data(data: list):
+#     """
+#     هذه الدالة لم تعد مستخدمة بعد الانتقال إلى قاعدة البيانات.
+#     """
+#     pass
 
 def load_servers(platform: str, country_code: str) -> list:
     """
-    يُحمّل السيرفرات المتاحة لمنصة ودولة معينتين (الكمية > 0 فقط).
+    يُحمّل السيرفرات المتاحة لمنصة ودولة معينتين من قاعدة البيانات.
 
     Args:
         platform (str): اسم المنصة (مثال: "WhatsApp").
         country_code (str): رمز كود الدولة (مثال: "sa").
 
     Returns:
-        list: قائمة بالسيرفرات المتوفرة التي تتطابق مع المعايير.
+        list: قائمة بكائنات Server المتوفرة التي تتطابق مع المعايير.
     """
-    # # هذه الدالة ستتغير لاحقاً لاستخدام قاعدة البيانات
-    all_data = load_all_servers_data()
-    for entry in all_data:
-        if entry["platform"] == platform and entry["country"] == country_code:
-            # # هنا نضيف الفلترة: نرجع السيرفرات التي كميتها > 0 فقط
-            available_servers = [s for s in entry.get("servers", []) if s.get("quantity", 0) > 0]
-            return available_servers
-    return []
+    for db in get_db(): # # استخدام get_db للحصول على جلسة
+        # # استخدام server_service لجلب السيرفرات
+        return server_service.get_servers_by_platform_and_country(db, platform, country_code)
+    return [] # إرجاع قائمة فارغة إذا لم يتمكن من الحصول على جلسة أو أي خطأ
 
-def server_keyboard(platform: str, country_code: str, lang_code: str = DEFAULT_LANGUAGE) -> InlineKeyboardMarkup: # # تم إضافة معامل lang_code
+
+def server_keyboard(platform: str, country_code: str, lang_code: str = DEFAULT_LANGUAGE) -> InlineKeyboardMarkup:
     """
     ينشئ لوحة مفاتيح الأزرار لعرض السيرفرات المتاحة لمنصة ودولة محددتين.
 
@@ -65,26 +59,30 @@ def server_keyboard(platform: str, country_code: str, lang_code: str = DEFAULT_L
     Returns:
         InlineKeyboardMarkup: لوحة المفاتيح المضمّنة بالسيرفرات.
     """
-    messages = get_messages(lang_code) # # جلب النصوص باللغة المطلوبة
-    servers = load_servers(platform, country_code)
+    messages = get_messages(lang_code)
+    servers = load_servers(platform, country_code) # # استخدام دالة load_servers المحلية التي تستخدم service
 
     buttons = []
     emoji_cycle = ["⚡", "🎯", "💎", "🚀", "🎲", "🧩"]
 
-    for i, server in enumerate(servers):
-        emoji = emoji_cycle[i % len(emoji_cycle)]
-        # # استخدام النص المترجم لـ "price_currency" و "available_quantity"
-        label = messages["server_button_label"].format(
-            emoji=emoji,
-            server_name=server['name'],
-            price=server['price'],
-            currency=messages["price_currency"], # # استخدام نص العملة المترجم
-            quantity=server.get('quantity', 0),
-            available_text=messages["available_quantity"] # # استخدام نص "متاح" المترجم
-        )
-        callback = f"buy_{platform}_{country_code}_{server['id']}"
-        buttons.append([InlineKeyboardButton(label, callback_data=callback)])
+    if not servers:
+        # إذا لم تكن هناك سيرفرات متاحة، اعرض رسالة مناسبة وزر العودة.
+        # هذا السيناريو يجب أن يكون قد تم التعامل معه في category_handler
+        # ولكن للتأكد، يمكن إضافة رسالة احتياطية هنا.
+        buttons.append([InlineKeyboardButton(messages["no_servers_available_general"], callback_data=f"select_app_{platform}")])
+    else:
+        for i, server in enumerate(servers): # # التكرار على كائنات Server
+            emoji = emoji_cycle[i % len(emoji_cycle)]
+            label = messages["server_button_label"].format(
+                emoji=emoji,
+                server_name=server.server_name, # # الوصول لـ .server_name
+                price=server.price, # # الوصول لـ .price
+                currency=messages["price_currency"],
+                quantity=server.quantity, # # الوصول لـ .quantity
+                available_text=messages["available_quantity"]
+            )
+            callback = f"buy_{platform}_{country_code}_{server.server_id}" # # استخدام .server_id
+            buttons.append([InlineKeyboardButton(label, callback_data=callback)])
 
-    # # استخدام النص المترجم لزر العودة
     buttons.append(back_button(text=messages["back_button_text"], callback_data=f"select_app_{platform}"))
     return create_reply_markup(buttons)
