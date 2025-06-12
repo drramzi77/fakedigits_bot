@@ -1,5 +1,5 @@
 # handlers/quick_search_handler.py
-
+import logging 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 # from keyboards.server_kb import load_servers # لم نعد بحاجة لها
@@ -34,6 +34,8 @@ ALL_COUNTRIES = {
     "الإمارات": "ae", "uae": "ae", "🇦🇪": "ae"
 }
 
+
+
 async def start_quick_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     يبدأ عملية البحث السريع عن الأرقام.
@@ -47,12 +49,20 @@ async def start_quick_search(update: Update, context: ContextTypes.DEFAULT_TYPE)
     lang_code = context.user_data.get("lang_code", DEFAULT_LANGUAGE)
     messages = get_messages(lang_code)
 
+    user = update.effective_user
+    # # تحديد الاسم المعروض: يوزرنيم أو الاسم الكامل، مع fallback للمعرف
+    display_name = user.username if user.username else f"{user.first_name or ''} {user.last_name or ''}".strip()
+    if not display_name:
+        display_name = messages["user_fallback_name"].format(user_id=user.id)
+
     await query.message.edit_text(
-        messages["quick_search_prompt"],
+        messages["quick_search_prompt"].format(display_name=display_name), # # تمرير display_name هنا
         reply_markup=create_reply_markup([
             back_button(callback_data="back_to_dashboard", text=messages["cancel_button"], lang_code=lang_code)
-        ])
+        ]),
+        parse_mode="HTML" # # تأكد من أن parse_mode هو HTML للسماح بـ <b>
     )
+    logging.info(f"المستخدم {user.id} بدأ البحث السريع. نص الترحيب مخصص باسمه: {display_name}.")
 
 async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """

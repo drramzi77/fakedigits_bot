@@ -418,7 +418,7 @@ messages = {
     # =========================================================================
     #  Quick Search
     # =========================================================================
-    "quick_search_prompt": "🌹 Hello 😊\nDr\\Ramzi\n\n— Please send the country name (in Arabic, English, or by flag emoji 🇸🇦) to search for it:\n\n──────────────",
+    "quick_search_prompt": "🌹 Hello <b>{display_name}</b> 😊\n\n— Please send the country name (in Arabic, English, or by flag emoji 🇸🇦) to search for it:\n\n──────────────",
     "country_not_found": "❌ This country was not found. Make sure the name is spelled correctly.",
     "no_servers_available_country_quick_search": "❗ No servers currently available for this country.",
     "quick_search_results": "📍 <b>Country:</b> {country_name}\n📱 <b>Platform:</b> {platform}\n💰 <b>Your Balance:</b> {balance} {currency}",
